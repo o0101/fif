@@ -1,6 +1,28 @@
 import { BinaryHandler, BinaryTypes } from './binary-bliss.js';
-import { unlinkSync, readFileSync } from 'fs';
+import { unlinkSync, readFileSync, existsSync } from 'fs';
 import path from 'path';
+
+function cleanUp(filePath) {
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
+}
+
+function assertEqual(expected, actual, message) {
+  if (expected !== actual) {
+    console.error(`Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+  } else {
+    console.log(`Test passed: ${message}`);
+  }
+}
+
+function assertBufferEqual(expected, actual, message) {
+  if (Buffer.compare(expected, actual) !== 0) {
+    console.error(`Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+  } else {
+    console.log(`Test passed: ${message}`);
+  }
+}
 
 function testColorType() {
   console.log('Testing Color Type');
@@ -29,12 +51,11 @@ function testColorType() {
   const readColor = BinaryTypes.read(handler, 'Color');
   handler.closeFile();
 
-  console.log('Written Color:', color);
-  console.log('Read Color:', readColor);
-  console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (green):', handler.$('green'));
+  assertEqual(color.red, readColor.red.value, 'Color red');
+  assertEqual(color.green, readColor.green.value, 'Color green');
+  assertEqual(color.blue, readColor.blue.value, 'Color blue');
 
-  //unlinkSync(filePath); // Clean up the file after test
+  cleanUp(filePath);
 }
 
 function testMapType() {
@@ -64,12 +85,12 @@ function testMapType() {
   const readMap = handler.map('map').value.value;
   handler.closeFile();
 
-  console.log('Written Map:', map);
-  console.log('Read Map:', readMap);
-  console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (key1):', handler.$('key1'));
+  assertEqual(map.size, readMap.size, 'Map size');
+  for (const [key, value] of map.entries()) {
+    assertEqual(value, readMap.get(key), `Map entry ${key}`);
+  }
 
-  //unlinkSync(filePath); // Clean up the file after test
+  cleanUp(filePath);
 }
 
 function testHeteroArray() {
@@ -85,12 +106,11 @@ function testHeteroArray() {
   const readArray = handler.heteroArray('array').value.value;
   handler.closeFile();
 
-  console.log('Written Array:', array);
-  console.log('Read Array:', readArray);
-  console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (value_0):', handler.$('value_0'));
+  assertEqual(array[0], readArray[0], 'HeteroArray string');
+  assertEqual(array[1], readArray[1], 'HeteroArray number');
+  assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'HeteroArray date');
 
-  //unlinkSync(filePath); // Clean up the file after test
+  cleanUp(filePath);
 }
 
 function testDateType() {
@@ -106,12 +126,9 @@ function testDateType() {
   const readDate = handler.date('date').value.value;
   handler.closeFile();
 
-  console.log('Written Date:', date);
-  console.log('Read Date:', readDate);
-  console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (date):', handler.$('date'));
+  assertEqual(date.toISOString(), readDate.toISOString(), 'Date value');
 
-  //unlinkSync(filePath); // Clean up the file after test
+  cleanUp(filePath);
 }
 
 function testFloatType() {
@@ -127,12 +144,9 @@ function testFloatType() {
   const readFloat = handler.float('float').value.value;
   handler.closeFile();
 
-  console.log('Written Float:', float);
-  console.log('Read Float:', readFloat);
-  console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (float):', handler.$('float'));
+  assertEqual(float.toFixed(3), readFloat.toFixed(3), 'Float value');
 
-  //unlinkSync(filePath); // Clean up the file after test
+  cleanUp(filePath);
 }
 
 function testBufferType() {
@@ -148,9 +162,9 @@ function testBufferType() {
   handler.buffer('buffer', buffer.length); // Reading buffer with specified length
   handler.closeFile();
 
-  console.log('Written Buffer Length:', buffer.length);
-  console.log('Read Buffer Length:', handler.$('buffer').value.length);
-  console.log('Buffer:', handler.value);
+  assertBufferEqual(buffer, handler.$('buffer').value, 'Buffer value');
+
+  cleanUp(filePath);
 }
 
 function testMagicNumber() {
@@ -166,7 +180,9 @@ function testMagicNumber() {
   handler.readMagic(magicNumber);    // Reading magic number
   handler.closeFile();
 
-  console.log('Magic Number:', handler.value);
+  assertEqual(magicNumber, handler.value.value, 'Magic number');
+
+  cleanUp(filePath);
 }
 
 function testMagicString() {
@@ -182,7 +198,9 @@ function testMagicString() {
   handler.readMagic(magicString);    // Reading magic string
   handler.closeFile();
 
-  console.log('Magic String:', handler.value);
+  assertEqual(magicString, handler.value.value, 'Magic string');
+
+  cleanUp(filePath);
 }
 
 function testMagicBuffer() {
@@ -198,7 +216,9 @@ function testMagicBuffer() {
   handler.readMagic(magicBuffer);    // Reading magic buffer
   handler.closeFile();
 
-  console.log('Magic Buffer:', handler.value);
+  assertBufferEqual(magicBuffer, handler.$('magic').value, 'Magic buffer');
+
+  cleanUp(filePath);
 }
 
 function runTests() {
