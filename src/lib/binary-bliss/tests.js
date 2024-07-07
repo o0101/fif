@@ -78,7 +78,7 @@ function testHeteroArray() {
     { name: 'value', type: 'gets' }
   ]);
 
-  const array = ['xyz', '000'];
+  const array = ['012', '345'];
   const filePath = path.join(process.cwd(), 'heteroArray.bin');
 
   const handler = new BinaryHandler();
