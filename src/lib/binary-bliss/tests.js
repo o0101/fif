@@ -1,5 +1,5 @@
 import { BinaryHandler, BinaryTypes } from './binary-bliss.js';
-import { unlinkSync } from 'fs';
+import { unlinkSync, readFileSync } from 'fs';
 import path from 'path';
 
 function testColorType() {
@@ -57,8 +57,10 @@ function testMapType() {
 
   const handler = new BinaryHandler();
   handler.openFile(filePath);
+  handler.writeMagic('MAP');
   handler.map(map);
   handler.jump(0);
+  handler.readMagic('MAP');
   const readMap = handler.map('map').value.value;
   handler.closeFile();
 
@@ -133,7 +135,77 @@ function testFloatType() {
   //unlinkSync(filePath); // Clean up the file after test
 }
 
+function testBufferType() {
+  console.log('Testing Buffer Type');
+
+  const buffer = readFileSync('color.bin');
+  const filePath = path.join(process.cwd(), 'buffer.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.buffer(buffer);  // Writing buffer
+  handler.jump(0);
+  handler.buffer('buffer', buffer.length); // Reading buffer with specified length
+  handler.closeFile();
+
+  console.log('Written Buffer Length:', buffer.length);
+  console.log('Read Buffer Length:', handler.$('buffer').value.length);
+  console.log('Buffer:', handler.value);
+}
+
+function testMagicNumber() {
+  console.log('Testing Magic Number');
+
+  const magicNumber = 513;
+  const filePath = path.join(process.cwd(), 'magic_number.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.writeMagic(magicNumber);   // Writing magic number
+  handler.jump(0);
+  handler.readMagic(magicNumber);    // Reading magic number
+  handler.closeFile();
+
+  console.log('Magic Number:', handler.value);
+}
+
+function testMagicString() {
+  console.log('Testing Magic String');
+
+  const magicString = "GIF4";
+  const filePath = path.join(process.cwd(), 'magic_string.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.writeMagic(magicString);   // Writing magic string
+  handler.jump(0);
+  handler.readMagic(magicString);    // Reading magic string
+  handler.closeFile();
+
+  console.log('Magic String:', handler.value);
+}
+
+function testMagicBuffer() {
+  console.log('Testing Magic Buffer');
+
+  const magicBuffer = Buffer.from("GIF4", 'utf8');
+  const filePath = path.join(process.cwd(), 'magic_buffer.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.writeMagic(magicBuffer);   // Writing magic buffer
+  handler.jump(0);
+  handler.readMagic(magicBuffer);    // Reading magic buffer
+  handler.closeFile();
+
+  console.log('Magic Buffer:', handler.value);
+}
+
 function runTests() {
+  testBufferType();
+  testMagicNumber();
+  testMagicString();
+  testMagicBuffer();
   testColorType();
   testMapType();
   testHeteroArray();

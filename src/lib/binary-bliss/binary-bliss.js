@@ -4,7 +4,7 @@ import { Buffer } from 'buffer';
 class BinaryHandler {
   constructor(endian = 'BE') {
     this.endian = endian;
-    this.buffer = Buffer.alloc(0);
+    this._buffer = Buffer.alloc(0);
     this.cursor = 0;
     this.bitCursor = 0;
     this.reading = [];
@@ -60,7 +60,7 @@ class BinaryHandler {
       this._ensureBytes(Math.ceil(length / 8));
       let value = 0;
       for (let i = 0; i < length; i++) {
-        const bit = (this.buffer[this.cursor] >> (7 - this.bitCursor)) & 1;
+        const bit = (this._buffer[this.cursor] >> (7 - this.bitCursor)) & 1;
         value = (value << 1) | bit;
         this.bitCursor = (this.bitCursor + 1) % 8;
         if (this.bitCursor === 0) {
@@ -74,15 +74,15 @@ class BinaryHandler {
       for (let i = 0; i < length; i++) {
         const bit = (value >> (length - 1 - i)) & 1;
         if (this.bitCursor === 0) {
-          this.buffer = Buffer.concat([this.buffer, Buffer.alloc(1)]);
+          this._buffer = Buffer.concat([this._buffer, Buffer.alloc(1)]);
         }
-        this.buffer[this.cursor] |= bit << (7 - this.bitCursor);
+        this._buffer[this.cursor] |= bit << (7 - this.bitCursor);
         this.bitCursor = (this.bitCursor + 1) % 8;
         if (this.bitCursor === 0) {
           this.cursor++;
         }
       }
-      this._writeBytes(this.buffer.slice(-Math.ceil(length / 8)));
+      this._writeBytes(this._buffer.slice(-Math.ceil(length / 8)));
       return this;
     }
   }
