@@ -243,7 +243,7 @@ class BinaryHandler {
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(8);
       const buffer = this._readBytes(8);
-      const value = new Date(buffer.readBigUInt64BE(0));
+      const value = new Date(Number(buffer.readBigUInt64BE(0)));
       this.reading.push({ key: keyOrValue, value, type: 'date' });
       return this;
     } else {
@@ -304,7 +304,6 @@ class BinaryHandler {
 
   array(keyOrValue, length, type, delimiter = null) {
     if (Array.isArray(keyOrValue)) {
-      if ( type == 'string' ) type = 'puts';
       const values = keyOrValue;
       for (let i = 0; i < values.length; i++) {
         this[type](values[i]);
@@ -314,7 +313,6 @@ class BinaryHandler {
       }
       return this;
     } else {
-      if ( type == 'string' ) type = 'gets';
       const key = keyOrValue;
       const values = [];
       for (let i = 0; i < length; i++) {
@@ -322,6 +320,60 @@ class BinaryHandler {
         values.push(this.$(`value_${i}`).value);
       }
       this.reading.push({ key, value: values, type: 'array' });
+      return this;
+    }
+  }
+
+  heteroArray(keyOrValue, length, delimiter = null) {
+    if (Array.isArray(keyOrValue)) {
+      const values = keyOrValue;
+      this.uint32(values.length);
+      for (let i = 0; i < values.length; i++) {
+        const element = values[i];
+        let type;
+        if (typeof element === 'string') {
+          type = 1;
+          this.uint8(type);
+          this.puts(element);
+        } else if (typeof element === 'number') {
+          type = 2;
+          this.uint8(type);
+          this.float(element);
+        } else if (element instanceof Date) {
+          type = 3;
+          this.uint8(type);
+          this.date(element);
+        }
+        // Handle other types similarly
+      }
+      return this;
+    } else {
+      const key = keyOrValue;
+      const values = [];
+      this.uint32('length');
+      const length = this.$('length').value;
+      for (let i = 0; i < length; i++) {
+        this.uint8(`type_${i}`);
+        const type = this.$(`type_${i}`).value;
+        let value;
+        switch (type) {
+          case 1:
+            this.gets(`value_${i}`);
+            value = this.$(`value_${i}`).value;
+            break;
+          case 2:
+            this.float(`value_${i}`);
+            value = this.$(`value_${i}`).value;
+            break;
+          case 3:
+            this.date(`value_${i}`);
+            value = this.$(`value_${i}`).value;
+            break;
+          // Handle other types similarly
+        }
+        values.push(value);
+      }
+      this.reading.push({ key, value: values, type: 'heteroArray' });
       return this;
     }
   }

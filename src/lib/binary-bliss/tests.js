@@ -73,19 +73,14 @@ function testMapType() {
 function testHeteroArray() {
   console.log('Testing Heterogeneous Array');
 
-  BinaryTypes.define('HeteroArrayElement', [
-    { name: 'type', type: 'uint8' },
-    { name: 'value', type: 'gets' }
-  ]);
-
-  const array = ['012', '345'];
+  const array = ['012', 345, new Date()];
   const filePath = path.join(process.cwd(), 'heteroArray.bin');
 
   const handler = new BinaryHandler();
   handler.openFile(filePath);
-  handler.array(array, array.length, 'string');
+  handler.heteroArray(array);
   handler.jump(0);
-  const readArray = handler.array('array', array.length, 'string').value.value;
+  const readArray = handler.heteroArray('array').value.value;
   handler.closeFile();
 
   console.log('Written Array:', array);
@@ -106,7 +101,7 @@ function testDateType() {
   handler.openFile(filePath);
   handler.date(date);
   handler.jump(0);
-  const readDate = handler.date('date').$().value;
+  const readDate = handler.date('date').value.value;
   handler.closeFile();
 
   console.log('Written Date:', date);
@@ -127,7 +122,7 @@ function testFloatType() {
   handler.openFile(filePath);
   handler.float(float);
   handler.jump(0);
-  const readFloat = handler.float('float').$().value;
+  const readFloat = handler.float('float').value.value;
   handler.closeFile();
 
   console.log('Written Float:', float);
