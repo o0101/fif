@@ -51,8 +51,8 @@ function testMapType() {
   ]);
 
   const map = new Map();
-  map.set('key1', 'value1');
-  map.set('key2', 'value2');
+  map.set('abc', '123');
+  map.set('def', '456');
   const filePath = path.join(process.cwd(), 'map.bin');
 
   const handler = new BinaryHandler();
@@ -65,7 +65,7 @@ function testMapType() {
   console.log('Written Map:', map);
   console.log('Read Map:', readMap);
   console.log('Most Recent Value:', handler.value);
-  console.log('Value by Key (key2):', handler.$('key2'));
+  console.log('Value by Key (key1):', handler.$('key1'));
 
   //unlinkSync(filePath); // Clean up the file after test
 }
@@ -78,7 +78,7 @@ function testHeteroArray() {
     { name: 'value', type: 'gets' }
   ]);
 
-  const array = ['value1', 'value2'];
+  const array = ['xyz', '000'];
   const filePath = path.join(process.cwd(), 'heteroArray.bin');
 
   const handler = new BinaryHandler();
@@ -110,10 +110,10 @@ function readMapType(handler) {
   const length = handler.$('length').value;
 
   for (let i = 0; i < length; i++) {
-    handler.gets('key');
-    handler.gets('value');
-    const key = handler.$('key').value;
-    const value = handler.$('value').value;
+    handler.gets(`key${i}`);
+    handler.gets(`value${i}`);
+    const key = handler.$(`key${i}`).value;
+    const value = handler.$(`value${i}`).value;
     map.set(key, value);
   }
   return map;
@@ -129,7 +129,6 @@ function writeHeteroArray(handler, array) {
       handler.uint8(type);
       handler.puts(element);
     }
-    // Handle other types similarly
   }
 }
 
