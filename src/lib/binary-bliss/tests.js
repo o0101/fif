@@ -39,8 +39,8 @@ function testMapType() {
   console.log('Testing Map Type');
 
   BinaryTypes.define('MapEntry', [
-    { name: 'key', type: 'str' },
-    { name: 'value', type: 'str' }
+    { name: 'key', type: 'gets' },
+    { name: 'value', type: 'gets' }
   ]);
 
   BinaryTypes.define('Map', [
@@ -71,7 +71,7 @@ function testHeteroArray() {
 
   BinaryTypes.define('HeteroArrayElement', [
     { name: 'type', type: 'uint8' },
-    { name: 'value', type: 'str' }
+    { name: 'value', type: 'gets' }
   ]);
 
   const array = ['value1', 'value2'];
@@ -91,7 +91,7 @@ function testHeteroArray() {
 }
 
 function writeMap(handler, map) {
-  handler.uint32(map.size, 'write');
+  handler.uint32(map.size);
   for (const [key, value] of map.entries()) {
     BinaryTypes.write(handler, 'MapEntry', { key, value });
   }
@@ -99,7 +99,7 @@ function writeMap(handler, map) {
 
 function readMapType(handler) {
   const map = new Map();
-  handler.uint32('length', 'read');
+  handler.uint32('length');
   const length = handler.reading.find(f => f.key === 'length').value;
 
   for (let i = 0; i < length; i++) {
@@ -110,7 +110,7 @@ function readMapType(handler) {
 }
 
 function writeHeteroArray(handler, array) {
-  handler.uint32(array.length, 'write');
+  handler.uint32(array.length);
   for (const element of array) {
     let type;
     if (typeof element === 'string') {
