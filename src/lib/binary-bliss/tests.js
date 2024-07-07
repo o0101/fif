@@ -1,6 +1,8 @@
-import { BinaryHandler, BinaryTypes, BinaryUtils } from './binary-bliss.js';
-import { Readable, Writable } from 'stream';
-import { Buffer } from 'buffer';
+import { BinaryHandler, BinaryTypes } from './binary-bliss.js';
+import fs from 'fs';
+import path from 'path';
+
+const __dirname = import.meta.dirname;
 
 class DebugBinaryHandler extends BinaryHandler {
   async _readNextChunk() {
@@ -46,40 +48,26 @@ async function testColorType() {
 
   const color = new Color(255, 128, 64);
 
-  // Collect written data in a buffer
-  let writtenBuffer = Buffer.alloc(0);
-  const writeStream = new Writable({
-    write(chunk, encoding, callback) {
-      console.log('Writing chunk:', chunk);
-      writtenBuffer = Buffer.concat([writtenBuffer, chunk]);
-      callback();
-    }
-  });
-
+  const filePath = path.join(__dirname, 'color.bin');
+  
+  const writeStream = fs.createWriteStream(filePath);
   const writeHandler = new DebugBinaryHandler(writeStream, 'write');
   await BinaryTypes.write(writeHandler, 'Color', color);
   await writeHandler.write();
 
-  console.log('Finished writing. Written Buffer:', writtenBuffer);
-
-  // Wait for the writable stream to finish
+  writeStream.end();
   writeStream.on('finish', async () => {
-    const readStream = new Readable({
-      read() {
-        console.log('Pushing buffer to read stream:', writtenBuffer);
-        this.push(writtenBuffer);
-        this.push(null);
-      }
-    });
+    console.log('Finished writing.');
 
+    const readStream = fs.createReadStream(filePath);
     const readHandler = new DebugBinaryHandler(readStream, 'read');
     const readColor = await BinaryTypes.read(readHandler, 'Color');
 
     console.log('Written Color:', color);
     console.log('Read Color:', readColor);
-  });
 
-  writeStream.end(); // Ensure the stream ends to trigger the 'finish' event
+    await fs.unlink(filePath); // Clean up the file after test
+  });
 }
 
 async function testMapType() {
@@ -99,40 +87,26 @@ async function testMapType() {
   map.set('key1', 'value1');
   map.set('key2', 'value2');
 
-  // Collect written data in a buffer
-  let writtenBuffer = Buffer.alloc(0);
-  const writeStream = new Writable({
-    write(chunk, encoding, callback) {
-      console.log('Writing chunk:', chunk);
-      writtenBuffer = Buffer.concat([writtenBuffer, chunk]);
-      callback();
-    }
-  });
+  const filePath = path.join(__dirname, 'map.bin');
 
+  const writeStream = fs.createWriteStream(filePath);
   const writeHandler = new DebugBinaryHandler(writeStream, 'write');
   await writeMap(writeHandler, map);
   await writeHandler.write();
 
-  console.log('Finished writing. Written Buffer:', writtenBuffer);
-
-  // Wait for the writable stream to finish
+  writeStream.end();
   writeStream.on('finish', async () => {
-    const readStream = new Readable({
-      read() {
-        console.log('Pushing buffer to read stream:', writtenBuffer);
-        this.push(writtenBuffer);
-        this.push(null);
-      }
-    });
+    console.log('Finished writing.');
 
+    const readStream = fs.createReadStream(filePath);
     const readHandler = new DebugBinaryHandler(readStream, 'read');
     const readMap = await readMapType(readHandler);
 
     console.log('Written Map:', Array.from(map.entries()));
     console.log('Read Map:', Array.from(readMap.entries()));
-  });
 
-  writeStream.end(); // Ensure the stream ends to trigger the 'finish' event
+    await fs.unlink(filePath); // Clean up the file after test
+  });
 }
 
 async function testHeteroArray() {
@@ -145,40 +119,26 @@ async function testHeteroArray() {
 
   const array = ['value1', 'value2'];
 
-  // Collect written data in a buffer
-  let writtenBuffer = Buffer.alloc(0);
-  const writeStream = new Writable({
-    write(chunk, encoding, callback) {
-      console.log('Writing chunk:', chunk);
-      writtenBuffer = Buffer.concat([writtenBuffer, chunk]);
-      callback();
-    }
-  });
+  const filePath = path.join(__dirname, 'heteroArray.bin');
 
+  const writeStream = fs.createWriteStream(filePath);
   const writeHandler = new DebugBinaryHandler(writeStream, 'write');
   await writeHeteroArray(writeHandler, array);
   await writeHandler.write();
 
-  console.log('Finished writing. Written Buffer:', writtenBuffer);
-
-  // Wait for the writable stream to finish
+  writeStream.end();
   writeStream.on('finish', async () => {
-    const readStream = new Readable({
-      read() {
-        console.log('Pushing buffer to read stream:', writtenBuffer);
-        this.push(writtenBuffer);
-        this.push(null);
-      }
-    });
+    console.log('Finished writing.');
 
+    const readStream = fs.createReadStream(filePath);
     const readHandler = new DebugBinaryHandler(readStream, 'read');
     const readArray = await readHeteroArray(readHandler, array.length);
 
     console.log('Written Array:', array);
     console.log('Read Array:', readArray);
-  });
 
-  writeStream.end(); // Ensure the stream ends to trigger the 'finish' event
+    await fs.unlink(filePath); // Clean up the file after test
+  });
 }
 
 async function writeMap(handler, map) {
