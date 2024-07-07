@@ -1,8 +1,5 @@
 import { BinaryHandler, BinaryTypes } from './binary-bliss.js';
-import { promises as fs } from 'fs';
 import path from 'path';
-
-const __dirname = import.meta.dirname;
 
 async function testColorType() {
   console.log('Testing Color Type');
@@ -22,7 +19,7 @@ async function testColorType() {
   ]);
 
   const color = new Color(255, 128, 64);
-  const filePath = path.join(__dirname, 'color.bin');
+  const filePath = path.join(process.cwd(), 'color.bin');
 
   const writeHandler = new BinaryHandler('write');
   await BinaryTypes.write(writeHandler, 'Color', color);
@@ -34,8 +31,6 @@ async function testColorType() {
 
   console.log('Written Color:', color);
   console.log('Read Color:', readColor);
-
-  await fs.unlink(filePath); // Clean up the file after test
 }
 
 async function testMapType() {
@@ -54,7 +49,7 @@ async function testMapType() {
   const map = new Map();
   map.set('key1', 'value1');
   map.set('key2', 'value2');
-  const filePath = path.join(__dirname, 'map.bin');
+  const filePath = path.join(process.cwd(), 'map.bin');
 
   const writeHandler = new BinaryHandler('write');
   await writeMap(writeHandler, map);
@@ -66,8 +61,6 @@ async function testMapType() {
 
   console.log('Written Map:', Array.from(map.entries()));
   console.log('Read Map:', Array.from(readMap.entries()));
-
-  await fs.unlink(filePath); // Clean up the file after test
 }
 
 async function testHeteroArray() {
@@ -79,7 +72,7 @@ async function testHeteroArray() {
   ]);
 
   const array = ['value1', 'value2'];
-  const filePath = path.join(__dirname, 'heteroArray.bin');
+  const filePath = path.join(process.cwd(), 'heteroArray.bin');
 
   const writeHandler = new BinaryHandler('write');
   await writeHeteroArray(writeHandler, array);
@@ -91,8 +84,6 @@ async function testHeteroArray() {
 
   console.log('Written Array:', array);
   console.log('Read Array:', readArray);
-
-  await fs.unlink(filePath); // Clean up the file after test
 }
 
 async function writeMap(handler, map) {
