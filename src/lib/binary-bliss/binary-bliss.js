@@ -74,63 +74,115 @@ class BinaryHandler {
   }
 
   async int8(keyOrValue) {
-    await this._ensureBytes(1);
-    const value = this.buffer.readInt8(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(1);
+      buffer.writeInt8(value, 0);
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(1);
+      const value = this.buffer.readInt8(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 1;
+      return this;
     }
-    this.cursor += 1;
-    return this;
   }
 
   async uint8(keyOrValue) {
-    await this._ensureBytes(1);
-    const value = this.buffer.readUInt8(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(1);
+      buffer.writeUInt8(value, 0);
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(1);
+      const value = this.buffer.readUInt8(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 1;
+      return this;
     }
-    this.cursor += 1;
-    return this;
   }
 
   async int16(keyOrValue) {
-    await this._ensureBytes(2);
-    const value = this.endian === 'BE' ? this.buffer.readInt16BE(this.cursor) : this.buffer.readInt16LE(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(2);
+      if (this.endian === 'BE') {
+        buffer.writeInt16BE(value, 0);
+      } else {
+        buffer.writeInt16LE(value, 0);
+      }
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(2);
+      const value = this.endian === 'BE' ? this.buffer.readInt16BE(this.cursor) : this.buffer.readInt16LE(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 2;
+      return this;
     }
-    this.cursor += 2;
-    return this;
   }
 
   async uint16(keyOrValue) {
-    await this._ensureBytes(2);
-    const value = this.endian === 'BE' ? this.buffer.readUInt16BE(this.cursor) : this.buffer.readUInt16LE(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(2);
+      if (this.endian === 'BE') {
+        buffer.writeUInt16BE(value, 0);
+      } else {
+        buffer.writeUInt16LE(value, 0);
+      }
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(2);
+      const value = this.endian === 'BE' ? this.buffer.readUInt16BE(this.cursor) : this.buffer.readUInt16LE(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 2;
+      return this;
     }
-    this.cursor += 2;
-    return this;
   }
 
   async int32(keyOrValue) {
-    await this._ensureBytes(4);
-    const value = this.endian === 'BE' ? this.buffer.readInt32BE(this.cursor) : this.buffer.readInt32LE(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(4);
+      if (this.endian === 'BE') {
+        buffer.writeInt32BE(value, 0);
+      } else {
+        buffer.writeInt32LE(value, 0);
+      }
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(4);
+      const value = this.endian === 'BE' ? this.buffer.readInt32BE(this.cursor) : this.buffer.readInt32LE(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 4;
+      return this;
     }
-    this.cursor += 4;
-    return this;
   }
 
   async uint32(keyOrValue) {
-    await this._ensureBytes(4);
-    const value = this.endian === 'BE' ? this.buffer.readUInt32BE(this.cursor) : this.buffer.readUInt32LE(this.cursor);
-    if (this.mode === 'read') {
+    if (this.mode === 'write') {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(4);
+      if (this.endian === 'BE') {
+        buffer.writeUInt32BE(value, 0);
+      } else {
+        buffer.writeUInt32LE(value, 0);
+      }
+      this.buffer = Buffer.concat([this.buffer, buffer]);
+      return this;
+    } else {
+      await this._ensureBytes(4);
+      const value = this.endian === 'BE' ? this.buffer.readUInt32BE(this.cursor) : this.buffer.readUInt32LE(this.cursor);
       this.reading.push({ key: keyOrValue, value });
+      this.cursor += 4;
+      return this;
     }
-    this.cursor += 4;
-    return this;
   }
 
   async jump(cursorPosition) {
@@ -219,7 +271,7 @@ class BinaryHandler {
   async readFromFile(filePath) {
     return new Promise((resolve, reject) => {
       this.stream = createReadStream(filePath);
-      this.stream.on('open', async () => {
+      this.stream.on('readable', async () => {
         try {
           await this._readNextChunk();
           resolve();
@@ -234,11 +286,13 @@ class BinaryHandler {
   async writeToFile(filePath) {
     return new Promise((resolve, reject) => {
       this.stream = createWriteStream(filePath);
-      this.stream.write(this.buffer, (err) => {
-        if (err) reject(err);
-        else this.stream.end();
+      this.stream.on('writable', () => {
+        this.stream.on('finish', resolve);
+        this.stream.write(this.buffer, (err) => {
+          if (err) reject(err);
+          else this.stream.end();
+        });
       });
-      this.stream.on('finish', resolve);
       this.stream.on('error', reject);
     });
   }
