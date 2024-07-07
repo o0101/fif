@@ -57,9 +57,9 @@ function testMapType() {
 
   const handler = new BinaryHandler();
   handler.openFile(filePath);
-  writeMap(handler, map);
+  handler.map(map);
   handler.jump(0);
-  const readMap = readMapType(handler);
+  const readMap = handler.map('map').value;
   handler.closeFile();
 
   console.log('Written Map:', map);
@@ -83,9 +83,9 @@ function testHeteroArray() {
 
   const handler = new BinaryHandler();
   handler.openFile(filePath);
-  writeHeteroArray(handler, array);
+  handler.array(array, array.length, 'string');
   handler.jump(0);
-  const readArray = readHeteroArray(handler);
+  const readArray = handler.array('array', array.length, 'string').value;
   handler.closeFile();
 
   console.log('Written Array:', array);
@@ -96,66 +96,54 @@ function testHeteroArray() {
   //unlinkSync(filePath); // Clean up the file after test
 }
 
-function writeMap(handler, map) {
-  handler.uint32(map.size);
-  for (const [key, value] of map.entries()) {
-    handler.puts(key);
-    handler.puts(value);
-  }
+function testDateType() {
+  console.log('Testing Date Type');
+
+  const date = new Date();
+  const filePath = path.join(process.cwd(), 'date.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.date(date);
+  handler.jump(0);
+  const readDate = handler.date('date').$().value;
+  handler.closeFile();
+
+  console.log('Written Date:', date);
+  console.log('Read Date:', readDate);
+  console.log('Most Recent Value:', handler.value);
+  console.log('Value by Key (date):', handler.$('date'));
+
+  //unlinkSync(filePath); // Clean up the file after test
 }
 
-function readMapType(handler) {
-  const map = new Map();
-  handler.uint32('length');
-  const length = handler.$('length').value;
+function testFloatType() {
+  console.log('Testing Float Type');
 
-  for (let i = 0; i < length; i++) {
-    handler.gets(`key${i}`);
-    handler.gets(`value${i}`);
-    const key = handler.$(`key${i}`).value;
-    const value = handler.$(`value${i}`).value;
-    map.set(key, value);
-  }
-  return map;
-}
+  const float = 123.456;
+  const filePath = path.join(process.cwd(), 'float.bin');
 
-function writeHeteroArray(handler, array) {
-  handler.uint32(array.length);
-  for (let i = 0; i < array.length; i++) {
-    const element = array[i];
-    let type;
-    if (typeof element === 'string') {
-      type = 1;
-      handler.uint8(type);
-      handler.puts(element);
-    }
-  }
-}
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.float(float);
+  handler.jump(0);
+  const readFloat = handler.float('float').$().value;
+  handler.closeFile();
 
-function readHeteroArray(handler) {
-  const array = [];
-  handler.uint32('length');
-  const length = handler.$('length').value;
-  for (let i = 0; i < length; i++) {
-    handler.uint8(`type_${i}`);
-    const type = handler.$(`type_${i}`).value;
-    let value;
-    switch (type) {
-      case 1:
-        handler.gets(`value_${i}`);
-        value = handler.$(`value_${i}`).value;
-        break;
-      // Handle other types similarly
-    }
-    array.push(value);
-  }
-  return array;
+  console.log('Written Float:', float);
+  console.log('Read Float:', readFloat);
+  console.log('Most Recent Value:', handler.value);
+  console.log('Value by Key (float):', handler.$('float'));
+
+  //unlinkSync(filePath); // Clean up the file after test
 }
 
 function runTests() {
   testColorType();
   testMapType();
   testHeteroArray();
+  testDateType();
+  testFloatType();
 }
 
 runTests();

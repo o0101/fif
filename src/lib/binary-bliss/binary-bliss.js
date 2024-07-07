@@ -199,6 +199,62 @@ class BinaryHandler {
     }
   }
 
+  float(keyOrValue) {
+    if (typeof keyOrValue === 'string') {
+      this._ensureBytes(4);
+      const buffer = this._readBytes(4);
+      const value = this.endian === 'BE' ? buffer.readFloatBE(0) : buffer.readFloatLE(0);
+      this.reading.push({ key: keyOrValue, value, type: 'float' });
+      return this;
+    } else {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(4);
+      if (this.endian === 'BE') {
+        buffer.writeFloatBE(value, 0);
+      } else {
+        buffer.writeFloatLE(value, 0);
+      }
+      this._writeBytes(buffer);
+      return this;
+    }
+  }
+
+  double(keyOrValue) {
+    if (typeof keyOrValue === 'string') {
+      this._ensureBytes(8);
+      const buffer = this._readBytes(8);
+      const value = this.endian === 'BE' ? buffer.readDoubleBE(0) : buffer.readDoubleLE(0);
+      this.reading.push({ key: keyOrValue, value, type: 'double' });
+      return this;
+    } else {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(8);
+      if (this.endian === 'BE') {
+        buffer.writeDoubleBE(value, 0);
+      } else {
+        buffer.writeDoubleLE(value, 0);
+      }
+      this._writeBytes(buffer);
+      return this;
+    }
+  }
+
+  date(keyOrValue) {
+    if (typeof keyOrValue === 'string') {
+      this._ensureBytes(8);
+      const buffer = this._readBytes(8);
+      const value = new Date(buffer.readBigUInt64BE(0));
+      this.reading.push({ key: keyOrValue, value, type: 'date' });
+      return this;
+    } else {
+      const value = keyOrValue;
+      const buffer = Buffer.alloc(8);
+      buffer.writeBigUInt64BE(BigInt(value.getTime()), 0);
+      this._writeBytes(buffer);
+      return this;
+    }
+  }
+
   jump(cursorPosition) {
     this.cursor = cursorPosition;
     this.bitCursor = 0; // Reset bit cursor when jumping
@@ -248,8 +304,10 @@ class BinaryHandler {
 
   array(keyOrValue, length, type, delimiter = null) {
     if (Array.isArray(keyOrValue)) {
+      if ( type == 'string' ) type = 'puts';
       const values = keyOrValue;
       for (let i = 0; i < values.length; i++) {
+        console.log(type, values[i]);
         this[type](values[i]);
         if (delimiter && i < values.length - 1) {
           this._writeBytes(Buffer.from(delimiter));
@@ -257,17 +315,40 @@ class BinaryHandler {
       }
       return this;
     } else {
+      if ( type == 'string' ) type = 'gets';
       const key = keyOrValue;
       const values = [];
       for (let i = 0; i < length; i++) {
-        const value = this[type](undefined);
-        values.push(value);
-        if (delimiter) {
-          this._ensureBytes(delimiter.length);
-          this.cursor += delimiter.length;
-        }
+        this[type](`value_${i}`);
+        values.push(this.$(`value_${i}`).value);
       }
       this.reading.push({ key, values, type: 'array' });
+      return this;
+    }
+  }
+
+  map(keyOrValue) {
+    if (keyOrValue instanceof Map) {
+      const map = keyOrValue;
+      this.uint32(map.size);
+      for (const [key, value] of map.entries()) {
+        this.puts(key);
+        this.puts(value);
+      }
+      return this;
+    } else {
+      const key = keyOrValue;
+      const map = new Map();
+      this.uint32('length');
+      const length = this.$('length').value;
+      for (let i = 0; i < length; i++) {
+        this.gets(`key${i}`);
+        this.gets(`value${i}`);
+        const key = this.$(`key${i}`).value;
+        const value = this.$(`value${i}`).value;
+        map.set(key, value);
+      }
+      this.reading.push({ key, value: map, type: 'map' });
       return this;
     }
   }
