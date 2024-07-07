@@ -1,4 +1,4 @@
-import { openSync, readSync, writeSync, closeSync, fstatSync } from 'fs';
+import { openSync, readSync, writeSync, closeSync, fstatSync, existsSync } from 'fs';
 import { Buffer } from 'buffer';
 
 class BinaryHandler {
@@ -17,7 +17,7 @@ class BinaryHandler {
   }
 
   openFile(filePath) {
-    this.fd = openSync(filePath, 'w+');
+    this.fd = openSync(filePath, existsSync(filePath) ? 'r+' : 'w+');
     return this;
   }
 
