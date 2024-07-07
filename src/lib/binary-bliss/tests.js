@@ -2,6 +2,9 @@ import { BinaryHandler, BinaryTypes } from './binary-bliss.js';
 import { unlinkSync, readFileSync, existsSync } from 'fs';
 import path from 'path';
 
+const greenCheck = '\x1b[32m✓\x1b[0m';
+const redCross = '\x1b[31m✗\x1b[0m';
+
 function cleanUp(filePath) {
   if (existsSync(filePath)) {
     unlinkSync(filePath);
@@ -10,17 +13,17 @@ function cleanUp(filePath) {
 
 function assertEqual(expected, actual, message) {
   if (expected !== actual) {
-    console.error(`Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
   } else {
-    console.log(`Test passed: ${message}`);
+    console.log(`${greenCheck} Test passed: ${message}`);
   }
 }
 
 function assertBufferEqual(expected, actual, message) {
   if (Buffer.compare(expected, actual) !== 0) {
-    console.error(`Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
   } else {
-    console.log(`Test passed: ${message}`);
+    console.log(`${greenCheck} Test passed: ${message}`);
   }
 }
 
