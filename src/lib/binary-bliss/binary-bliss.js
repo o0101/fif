@@ -69,6 +69,46 @@ class BinaryHandler {
     }
   }
 
+  async int8(keyOrValue) {
+    await this._ensureBytes(1);
+    const value = this.buffer.readInt8(this.cursor);
+    if (this.mode === 'read') {
+      this.reading.push({ key: keyOrValue, value });
+    }
+    this.cursor += 1;
+    return this;
+  }
+
+  async uint8(keyOrValue) {
+    await this._ensureBytes(1);
+    const value = this.buffer.readUInt8(this.cursor);
+    if (this.mode === 'read') {
+      this.reading.push({ key: keyOrValue, value });
+    }
+    this.cursor += 1;
+    return this;
+  }
+
+  async int16(keyOrValue) {
+    await this._ensureBytes(2);
+    const value = this.endian === 'BE' ? this.buffer.readInt16BE(this.cursor) : this.buffer.readInt16LE(this.cursor);
+    if (this.mode === 'read') {
+      this.reading.push({ key: keyOrValue, value });
+    }
+    this.cursor += 2;
+    return this;
+  }
+
+  async uint16(keyOrValue) {
+    await this._ensureBytes(2);
+    const value = this.endian === 'BE' ? this.buffer.readUInt16BE(this.cursor) : this.buffer.readUInt16LE(this.cursor);
+    if (this.mode === 'read') {
+      this.reading.push({ key: keyOrValue, value });
+    }
+    this.cursor += 2;
+    return this;
+  }
+
   async int32(keyOrValue) {
     await this._ensureBytes(4);
     const value = this.endian === 'BE' ? this.buffer.readInt32BE(this.cursor) : this.buffer.readInt32LE(this.cursor);
