@@ -31,6 +31,8 @@ function testColorType() {
 
   console.log('Written Color:', color);
   console.log('Read Color:', readColor);
+  console.log('Most Recent Value:', handler.value);
+  console.log('Value by Key (green):', handler.$('green'));
 
   //unlinkSync(filePath); // Clean up the file after test
 }
@@ -60,8 +62,10 @@ function testMapType() {
   const readMap = readMapType(handler);
   handler.closeFile();
 
-  console.log('Written Map:', Array.from(map.entries()));
-  console.log('Read Map:', Array.from(readMap.entries()));
+  console.log('Written Map:', map);
+  console.log('Read Map:', readMap);
+  console.log('Most Recent Value:', handler.value);
+  console.log('Value by Key (key2):', handler.$('key2'));
 
   //unlinkSync(filePath); // Clean up the file after test
 }
@@ -86,6 +90,8 @@ function testHeteroArray() {
 
   console.log('Written Array:', array);
   console.log('Read Array:', readArray);
+  console.log('Most Recent Value:', handler.value);
+  console.log('Value by Key (value_0):', handler.$('value_0'));
 
   //unlinkSync(filePath); // Clean up the file after test
 }
@@ -101,16 +107,14 @@ function writeMap(handler, map) {
 function readMapType(handler) {
   const map = new Map();
   handler.uint32('length');
-  const length = handler.reading.find(f => f.key === 'length').value;
+  const length = handler.$('length').value;
 
   for (let i = 0; i < length; i++) {
     handler.gets('key');
     handler.gets('value');
-    const key = handler.reading.find(f => f.key === 'key').value;
-    const value = handler.reading.find(f => f.key === 'value').value;
+    const key = handler.$('key').value;
+    const value = handler.$('value').value;
     map.set(key, value);
-    // Clear previous reads
-    handler.reading = handler.reading.filter(f => f.key !== 'key' && f.key !== 'value');
   }
   return map;
 }
@@ -132,21 +136,19 @@ function writeHeteroArray(handler, array) {
 function readHeteroArray(handler) {
   const array = [];
   handler.uint32('length');
-  const length = handler.reading.find(f => f.key === 'length').value;
+  const length = handler.$('length').value;
   for (let i = 0; i < length; i++) {
     handler.uint8(`type_${i}`);
-    const type = handler.reading.find(f => f.key === `type_${i}`).value;
+    const type = handler.$(`type_${i}`).value;
     let value;
     switch (type) {
       case 1:
         handler.gets(`value_${i}`);
-        value = handler.reading.find(f => f.key === `value_${i}`).value;
+        value = handler.$(`value_${i}`).value;
         break;
       // Handle other types similarly
     }
     array.push(value);
-    // Clear previous reads
-    handler.reading = handler.reading.filter(f => f.key !== `type_${i}` && f.key !== `value_${i}`);
   }
   return array;
 }

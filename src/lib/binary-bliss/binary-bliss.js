@@ -209,13 +209,15 @@ class BinaryHandler {
     let buffer;
 
     if (len === null) {
+      // Non-fixed length string with metadata
       buffer = Buffer.from(value, encoding);
       const metaLength = Buffer.alloc(4);
       metaLength.writeUInt32BE(buffer.length, 0);
-      const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); 
-      const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); 
+      const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
+      const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); // Fixed length for delimiter
       this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
     } else {
+      // Fixed length string
       buffer = Buffer.alloc(len);
       buffer.write(value, 0, len, encoding);
       this._writeBytes(buffer);
@@ -230,11 +232,12 @@ class BinaryHandler {
       const value = this._readBytes(len).toString(encoding);
       this.reading.push({ key, value, type: 'string' });
     } else {
-      this._ensureBytes(4);
+      // Read metadata
+      this._ensureBytes(4); // Read length
       const strLength = this._readBytes(4).readUInt32BE(0);
-      this._ensureBytes(5);
+      this._ensureBytes(5); // Read encoding
       const strEncoding = this._readBytes(5).toString('utf8').replace(/\0/g, '');
-      this._ensureBytes(5);
+      this._ensureBytes(5); // Read delimiter
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
       const value = this._readBytes(strLength).toString(strEncoding);
@@ -275,6 +278,14 @@ class BinaryHandler {
       result[key] = { value, type };
     }
     return result;
+  }
+
+  get value() {
+    return this.reading.length ? this.reading[this.reading.length - 1] : null;
+  }
+
+  $(searchKey) {
+    return this.reading.find(item => item.key === searchKey) || null;
   }
 }
 
