@@ -57,8 +57,6 @@ function testColorType() {
   assertEqual(color.red, readColor.red.value, 'Color red');
   assertEqual(color.green, readColor.green.value, 'Color green');
   assertEqual(color.blue, readColor.blue.value, 'Color blue');
-
-  cleanUp(filePath);
 }
 
 function testMapType() {
