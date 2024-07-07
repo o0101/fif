@@ -81,7 +81,7 @@ function testHeteroArray() {
   handler.openFile(filePath);
   writeHeteroArray(handler, array);
   handler.jump(0);
-  const readArray = readHeteroArray(handler, array.length);
+  const readArray = readHeteroArray(handler);
   handler.closeFile();
 
   console.log('Written Array:', array);
@@ -93,7 +93,8 @@ function testHeteroArray() {
 function writeMap(handler, map) {
   handler.uint32(map.size);
   for (const [key, value] of map.entries()) {
-    BinaryTypes.write(handler, 'MapEntry', { key, value });
+    handler.puts(key);
+    handler.puts(value);
   }
 }
 
@@ -103,34 +104,50 @@ function readMapType(handler) {
   const length = handler.reading.find(f => f.key === 'length').value;
 
   for (let i = 0; i < length; i++) {
-    const entry = BinaryTypes.read(handler, 'MapEntry');
-    map.set(entry.key, entry.value);
+    handler.gets('key');
+    handler.gets('value');
+    const key = handler.reading.find(f => f.key === 'key').value;
+    const value = handler.reading.find(f => f.key === 'value').value;
+    map.set(key, value);
+    // Clear previous reads
+    handler.reading = handler.reading.filter(f => f.key !== 'key' && f.key !== 'value');
   }
   return map;
 }
 
 function writeHeteroArray(handler, array) {
   handler.uint32(array.length);
-  for (const element of array) {
+  for (let i = 0; i < array.length; i++) {
+    const element = array[i];
     let type;
     if (typeof element === 'string') {
       type = 1;
+      handler.uint8(type);
+      handler.puts(element);
     }
-    // Handle other types
-    BinaryTypes.write(handler, 'HeteroArrayElement', { type, value: element });
+    // Handle other types similarly
   }
 }
 
-function readHeteroArray(handler, length) {
+function readHeteroArray(handler) {
   const array = [];
+  handler.uint32('length');
+  const length = handler.reading.find(f => f.key === 'length').value;
   for (let i = 0; i < length; i++) {
-    const element = BinaryTypes.read(handler, 'HeteroArrayElement');
-    switch (element.type) {
+    handler.uint8(`type_${i}`);
+    const type = handler.reading.find(f => f.key === `type_${i}`).value;
+    console.log(handler.reading);
+    let value;
+    switch (type) {
       case 1:
-        array.push(element.value); // Assuming type 1 is string
+        handler.gets(`value_${i}`);
+        value = handler.reading.find(f => f.key === `value_${i}`).value;
         break;
-      // Handle other types
+      // Handle other types similarly
     }
+    array.push(value);
+    // Clear previous reads
+    handler.reading = handler.reading.filter(f => f.key !== `type_${i}` && f.key !== `value_${i}`);
   }
   return array;
 }
