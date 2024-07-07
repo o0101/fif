@@ -307,7 +307,6 @@ class BinaryHandler {
       if ( type == 'string' ) type = 'puts';
       const values = keyOrValue;
       for (let i = 0; i < values.length; i++) {
-        console.log(type, values[i]);
         this[type](values[i]);
         if (delimiter && i < values.length - 1) {
           this._writeBytes(Buffer.from(delimiter));
@@ -322,7 +321,7 @@ class BinaryHandler {
         this[type](`value_${i}`);
         values.push(this.$(`value_${i}`).value);
       }
-      this.reading.push({ key, values, type: 'array' });
+      this.reading.push({ key, value: values, type: 'array' });
       return this;
     }
   }

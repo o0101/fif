@@ -59,7 +59,7 @@ function testMapType() {
   handler.openFile(filePath);
   handler.map(map);
   handler.jump(0);
-  const readMap = handler.map('map').value;
+  const readMap = handler.map('map').value.value;
   handler.closeFile();
 
   console.log('Written Map:', map);
@@ -85,7 +85,7 @@ function testHeteroArray() {
   handler.openFile(filePath);
   handler.array(array, array.length, 'string');
   handler.jump(0);
-  const readArray = handler.array('array', array.length, 'string').value;
+  const readArray = handler.array('array', array.length, 'string').value.value;
   handler.closeFile();
 
   console.log('Written Array:', array);
