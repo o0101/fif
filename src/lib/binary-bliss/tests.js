@@ -136,7 +136,6 @@ function readHeteroArray(handler) {
   for (let i = 0; i < length; i++) {
     handler.uint8(`type_${i}`);
     const type = handler.reading.find(f => f.key === `type_${i}`).value;
-    console.log(handler.reading);
     let value;
     switch (type) {
       case 1:
