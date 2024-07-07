@@ -404,6 +404,85 @@ class BinaryHandler {
     }
   }
 
+  buffer(keyOrBuffer, length = null) {
+    if (typeof keyOrBuffer === 'string') {
+      const key = keyOrBuffer;
+      this._ensureBytes(length);
+      const buffer = this._readBytes(length);
+      this.reading.push({ key, value: buffer, type: 'buffer' });
+      return this;
+    } else if (Buffer.isBuffer(keyOrBuffer)) {
+      const buffer = keyOrBuffer;
+      this._writeBytes(buffer);
+      return this;
+    } else {
+      throw new Error('Invalid argument for buffer method');
+    }
+  }
+
+  writeMagic(data) {
+    this.jump(0);
+    if (typeof data === 'number') {
+      let bytes;
+      if (data < 0x100) {
+        bytes = Buffer.alloc(1);
+        bytes.writeUInt8(data, 0);
+      } else if (data < 0x10000) {
+        bytes = Buffer.alloc(2);
+        bytes.writeUInt16BE(data, 0);
+      } else if (data < 0x1000000) {
+        bytes = Buffer.alloc(3);
+        bytes.writeUIntBE(data, 0, 3);
+      } else {
+        bytes = Buffer.alloc(4);
+        bytes.writeUInt32BE(data, 0);
+      }
+      this._writeBytes(bytes);
+    } else if (typeof data === 'string') {
+      const buffer = Buffer.from(data, 'utf8');
+      this._writeBytes(buffer);
+    } else if (Buffer.isBuffer(data)) {
+      this.buffer(data);
+    }
+    return this;
+  }
+
+  readMagic(data) {
+    this.jump(0);
+    if (typeof data === 'number') {
+      let length;
+      if (data < 0x100) {
+        length = 1;
+      } else if (data < 0x10000) {
+        length = 2;
+      } else if (data < 0x1000000) {
+        length = 3;
+      } else {
+        length = 4;
+      }
+      const buffer = this._readBytes(length);
+      let value;
+      if (length === 1) {
+        value = buffer.readUInt8(0);
+      } else if (length === 2) {
+        value = buffer.readUInt16BE(0);
+      } else if (length === 3) {
+        value = buffer.readUIntBE(0, 3);
+      } else {
+        value = buffer.readUInt32BE(0);
+      }
+      this.reading.push({ key: 'magic', value, type: 'number' });
+    } else if (typeof data === 'string') {
+      const length = data.length;
+      const buffer = this._readBytes(length);
+      const value = buffer.toString('utf8');
+      this.reading.push({ key: 'magic', value, type: 'string' });
+    } else if (Buffer.isBuffer(data)) {
+      this.buffer('magic', data.length);
+    }
+    return this;
+  }
+
   read() {
     const result = {};
     for (const { key, value, type } of this.reading) {
