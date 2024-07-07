@@ -225,11 +225,11 @@ function testMagicBuffer() {
 }
 
 function runTests() {
+  testColorType();
   testBufferType();
   testMagicNumber();
   testMagicString();
   testMagicBuffer();
-  testColorType();
   testMapType();
   testHeteroArray();
   testDateType();
