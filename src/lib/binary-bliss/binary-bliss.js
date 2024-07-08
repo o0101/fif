@@ -7,6 +7,9 @@ import { Buffer } from 'buffer';
   needing (or not needing but suspecting we may need) to use `value${i}` in readTypeAnd
 **/
 
+const ATextEncoder = new TextEncoder;
+const ATextDecoder = new TextDecoder;
+
 class BinaryHandler {
   constructor(endian = 'BE') {
     this.endian = endian;
@@ -42,11 +45,17 @@ class BinaryHandler {
   _readBytes(length, opts = {}) {
     const buffer = Buffer.alloc(length);
     readSync(this.fd, buffer, 0, length, this.cursor);
+    if ( opts.decode ) {
+      BinaryUtils.decode(buffer);
+    }
     this.cursor += length;
     return buffer;
   }
 
   _writeBytes(buffer, opts = {}) {
+    if ( opts.encode ) {
+      BinaryUtils.encode(buffer);
+    }
     writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
     this.cursor += buffer.length;
   }
@@ -270,6 +279,7 @@ class BinaryHandler {
   puts(value, len = null, encoding = 'utf8', delimiter = null) {
     let buffer;
 
+    value = ATextEncoder.encode(value);
     if (len === null) {
       // Non-fixed length string with metadata
       buffer = Buffer.from(value, encoding);
@@ -292,6 +302,7 @@ class BinaryHandler {
     if (len !== null) {
       this._ensureBytes(len);
       const value = this._readBytes(len, {decode: true}).toString(encoding);
+      value = ATextDecoder.decode(value);
       this.reading.push({ key, value, type: 'string' });
     } else {
       // Read metadata
@@ -303,6 +314,7 @@ class BinaryHandler {
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
       const value = this._readBytes(strLength, {decode: true}).toString(strEncoding);
+      value = TextDecoder.decode(value);
       this.reading.push({ key, value, type: 'string' });
     }
     return this;
@@ -587,6 +599,26 @@ const BinaryUtils = {
   chopBits(bits, length) {
     return bits.slice(0, length);
   },
+
+  encode(buf) {
+    return buf;
+    if ( buf.length == 0 ) return;
+
+    for( let i = 0; i < buf.length; i++ ) {
+      console.log(buf[i]);
+      //buf[i] ^= 123;
+    }
+  },
+
+  decode(buf) {
+    return buf;
+    if ( buf.length == 0 ) return;
+
+    for( let i = 0; i < buf.length; i++ ) {
+      console.log(buf[i]);
+      //buf[i] ^= 123;
+    }
+  }
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils };
