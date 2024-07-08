@@ -277,6 +277,174 @@ function testPojoType() {
   cleanUp(filePath);
 }
 
+function testComplexNonLatinObject() {
+  console.log('Testing Complex Object with Non-Latin Characters');
+
+  const complexObject = {
+    greeting: "你好",
+    farewell: "مع السلامة",
+    mixed: "Hello, 你好, مرحبا!",
+    nested: {
+      question: "你好吗？",
+      answer: "الحمد لله"
+    }
+  };
+  const filePath = path.join(process.cwd(), 'complex_non_latin_object.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(complexObject);
+  handler.jump(0);
+  const readObject = handler.pojo('complexObject').value.value;
+  handler.closeFile();
+
+  assertEqual(complexObject.greeting, readObject.greeting, 'Complex object greeting');
+  assertEqual(complexObject.farewell, readObject.farewell, 'Complex object farewell');
+  assertEqual(complexObject.mixed, readObject.mixed, 'Complex object mixed');
+  assertEqual(complexObject.nested.question, readObject.nested.question, 'Complex object nested question');
+  assertEqual(complexObject.nested.answer, readObject.nested.answer, 'Complex object nested answer');
+
+  cleanUp(filePath);
+}
+
+function testMapWithPojo() {
+  console.log('Testing Map with POJO Value');
+
+  const mapWithPojo = new Map();
+  mapWithPojo.set('key1', 'value1');
+  mapWithPojo.set('key2', { name: 'Test', greeting: "你好" });
+
+  const filePath = path.join(process.cwd(), 'map_with_pojo.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.map(mapWithPojo);
+  handler.jump(0);
+  const readMap = handler.map('mapWithPojo').value.value;
+  handler.closeFile();
+
+  assertEqual(mapWithPojo.size, readMap.size, 'Map with POJO size');
+  assertEqual(mapWithPojo.get('key1'), readMap.get('key1'), 'Map with POJO key1 value');
+  assertEqual(mapWithPojo.get('key2').name, readMap.get('key2').name, 'Map with POJO key2 name');
+  assertEqual(mapWithPojo.get('key2').greeting, readMap.get('key2').greeting, 'Map with POJO key2 greeting');
+
+  cleanUp(filePath);
+}
+
+function testPojoWithMap() {
+  console.log('Testing POJO with Map Value');
+
+  const pojoWithMap = {
+    name: 'Test POJO',
+    details: new Map([
+      ['language', 'JavaScript'],
+      ['greeting', '你好']
+    ])
+  };
+
+  const filePath = path.join(process.cwd(), 'pojo_with_map.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(pojoWithMap);
+  handler.jump(0);
+  const readPojo = handler.pojo('pojoWithMap').value.value;
+  handler.closeFile();
+
+  assertEqual(pojoWithMap.name, readPojo.name, 'POJO with Map name');
+  assertEqual(pojoWithMap.details.size, readPojo.details.size, 'POJO with Map details size');
+  assertEqual(pojoWithMap.details.get('language'), readPojo.details.get('language'), 'POJO with Map details language');
+  assertEqual(pojoWithMap.details.get('greeting'), readPojo.details.get('greeting'), 'POJO with Map details greeting');
+
+  cleanUp(filePath);
+}
+
+function testSetType() {
+  console.log('Testing Set Type');
+
+  const set = new Set([1, 'two', new Date()]);
+  const filePath = path.join(process.cwd(), 'set.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.set(set);
+  handler.jump(0);
+  const readSet = handler.set('set').value.value;
+  handler.closeFile();
+
+  const setArray = Array.from(set);
+  const readSetArray = Array.from(readSet);
+
+  assertEqual(setArray.length, readSetArray.length, 'Set length');
+  for (let i = 0; i < setArray.length; i++) {
+    if (setArray[i] instanceof Date) {
+      assertEqual(setArray[i].toISOString(), readSetArray[i].toISOString(), `Set element ${i}`);
+    } else {
+      assertEqual(setArray[i], readSetArray[i], `Set element ${i}`);
+    }
+  }
+
+  cleanUp(filePath);
+}
+
+function testPojoWithSet() {
+  console.log('Testing POJO with Set Value');
+
+  const pojoWithSet = {
+    name: 'Test POJO',
+    details: new Set(['JavaScript', '你好'])
+  };
+
+  const filePath = path.join(process.cwd(), 'pojo_with_set.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(pojoWithSet);
+  handler.jump(0);
+  const readPojo = handler.pojo('pojoWithSet').value.value;
+  handler.closeFile();
+
+  assertEqual(pojoWithSet.name, readPojo.name, 'POJO with Set name');
+  assertEqual(pojoWithSet.details.size, readPojo.details.size, 'POJO with Set details size');
+
+  const detailsArray = Array.from(pojoWithSet.details);
+  const readDetailsArray = Array.from(readPojo.details);
+  for (let i = 0; i < detailsArray.length; i++) {
+    assertEqual(detailsArray[i], readDetailsArray[i], `POJO with Set details element ${i}`);
+  }
+
+  cleanUp(filePath);
+}
+
+function testSetWithPojo() {
+  console.log('Testing Set with POJO Value');
+
+  const setWithPojo = new Set([
+    { language: 'JavaScript', greeting: '你好' },
+    { language: 'Python', greeting: 'مرحبا' }
+  ]);
+
+  const filePath = path.join(process.cwd(), 'set_with_pojo.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.set(setWithPojo);
+  handler.jump(0);
+  const readSet = handler.set('setWithPojo').value.value;
+  handler.closeFile();
+
+  const setArray = Array.from(setWithPojo);
+  const readSetArray = Array.from(readSet);
+
+  assertEqual(setArray.length, readSetArray.length, 'Set with POJO length');
+  for (let i = 0; i < setArray.length; i++) {
+    assertEqual(setArray[i].language, readSetArray[i].language, `Set with POJO element ${i} language`);
+    assertEqual(setArray[i].greeting, readSetArray[i].greeting, `Set with POJO element ${i} greeting`);
+  }
+
+  cleanUp(filePath);
+}
+
 function runTests() {
   testColorType();
   testBufferType();
@@ -289,6 +457,12 @@ function runTests() {
   testFloatType();
   testPojoType();
   testMixedTypeArray();
+  testComplexNonLatinObject();
+  testMapWithPojo();
+  testPojoWithMap();
+  testSetType();
+  testSetWithPojo();
+  testPojoWithSet();
 }
 
 runTests();

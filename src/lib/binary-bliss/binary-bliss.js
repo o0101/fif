@@ -9,6 +9,7 @@ import { Buffer } from 'buffer';
 
 const ATextEncoder = new TextEncoder;
 const ATextDecoder = new TextDecoder;
+const ETEXT = true;
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -45,7 +46,7 @@ class BinaryHandler {
   _readBytes(length, opts = {}) {
     const buffer = Buffer.alloc(length);
     readSync(this.fd, buffer, 0, length, this.cursor);
-    if ( opts.decode ) {
+    if ( opts.decode && ETEXT ) {
       BinaryUtils.decode(buffer);
     }
     this.cursor += length;
@@ -53,7 +54,7 @@ class BinaryHandler {
   }
 
   _writeBytes(buffer, opts = {}) {
-    if ( opts.encode ) {
+    if ( opts.encode && ETEXT ) {
       BinaryUtils.encode(buffer);
     }
     writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
@@ -287,11 +288,16 @@ class BinaryHandler {
       metaLength.writeUInt32BE(buffer.length, 0);
       const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
       const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); // Fixed length for delimiter
-      this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]), {encode: true});
+      if ( ETEXT ) {
+        BinaryUtils.encode(metaEncoding)
+        BinaryUtils.encode(buffer)
+      }
+      this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
     } else {
       // Fixed length string
       buffer = Buffer.alloc(len);
       buffer.write(value, 0, len, encoding);
+      console.log('encode', buffer);
       this._writeBytes(buffer, {encode: true});
     }
     return this;
@@ -302,19 +308,19 @@ class BinaryHandler {
     if (len !== null) {
       this._ensureBytes(len);
       const value = this._readBytes(len, {decode: true}).toString(encoding);
-      value = ATextDecoder.decode(value);
+      value = ATextDecoder.decode(value.buffer.slice(0, buffer.length));
       this.reading.push({ key, value, type: 'string' });
     } else {
       // Read metadata
       this._ensureBytes(4); // Read length
       const strLength = this._readBytes(4).readUInt32BE(0);
       this._ensureBytes(5); // Read encoding
-      const strEncoding = this._readBytes(5).toString('utf8').replace(/\0/g, '');
+      const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(5); // Read delimiter
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
-      const value = this._readBytes(strLength, {decode: true}).toString(strEncoding);
-      value = TextDecoder.decode(value);
+      let value = this._readBytes(strLength, {decode: true});
+      value = ATextDecoder.decode(value.buffer.slice(0, value.buffer.length));
       this.reading.push({ key, value, type: 'string' });
     }
     return this;
@@ -392,7 +398,6 @@ class BinaryHandler {
     }
   }
 
-
   _writeTypeAndValue(value) {
     if (typeof value === 'string') {
       this.uint8(1);
@@ -406,6 +411,12 @@ class BinaryHandler {
     } else if (Array.isArray(value)) {
       this.uint8(4);
       this.heteroArray(value);
+    } else if (value instanceof Map) {
+      this.uint8(6);
+      this.map(value);
+    } else if (value instanceof Set) {
+      this.uint8(7);
+      this.set(value);
     } else if (typeof value === 'object' && value !== null) {
       this.uint8(5);
       this.pojo(value);
@@ -433,9 +444,39 @@ class BinaryHandler {
         this.pojo(uniq);
         value = this.$(uniq).value;
         break;
+      case 6:
+        this.map(uniq);
+        value = this.$(uniq).value;
+        break;
+      case 7:
+        this.set(uniq);
+        value = this.$(uniq).value;
+        break;
       // Handle other types similarly
     }
     return value;
+  }
+
+  set(keyOrValue) {
+    if (keyOrValue instanceof Set) {
+      const set = keyOrValue;
+      this.uint32(set.size);
+      for (const value of set) {
+        this._writeTypeAndValue(value);
+      }
+      return this;
+    } else {
+      const key = keyOrValue;
+      const set = new Set();
+      this.uint32('length');
+      const length = this.$('length').value;
+      for (let i = 0; i < length; i++) {
+        const value = this._readTypeAndValue();
+        set.add(value);
+      }
+      this.reading.push({ key, value: set, type: 'set' });
+      return this;
+    }
   }
 
   pojo(keyOrValue) {
@@ -600,25 +641,67 @@ const BinaryUtils = {
     return bits.slice(0, length);
   },
 
+  encode(buffer) {
+    const EC = this.ENCODE_SHIFT;
+    const ER = 8 - EC;
+    if (buffer.length == 0) return;
+
+    let leftCarry = buffer[0] >> ER;
+
+    for (let i = 0; i < buffer.length; i++) {
+      const currentByte = buffer[i];
+      buffer[i] = (currentByte << EC) & 0xFF;
+      if ((i + 1) === buffer.length) {
+        buffer[i] |= leftCarry;
+      } else {
+        buffer[i] |= (buffer[i + 1] >> ER) & 0xFF;
+      }
+    }
+
+    return buffer;
+  },
+
+  decode(buffer) {
+    const EC = this.ENCODE_SHIFT;
+    const ER = 8 - EC;
+    if (buffer.length == 0) return;
+
+    let rightCarry = buffer[buffer.length - 1] << ER;
+
+    for (let i = buffer.length - 1; i >= 0; i--) {
+      const currentByte = buffer[i];
+      buffer[i] = (currentByte >> EC) & 0xFF;
+      if (i === 0) {
+        buffer[i] |= rightCarry & 0xFF;
+      } else {
+        buffer[i] |= (buffer[i - 1] << ER) & 0xFF;
+      }
+    }
+
+    return buffer;
+  }
+
+  /*
   encode(buf) {
-    return buf;
-    if ( buf.length == 0 ) return;
+    if ( buf.length == 0 ) return buf;
 
     for( let i = 0; i < buf.length; i++ ) {
-      console.log(buf[i]);
-      //buf[i] ^= 123;
+      buf[i] ^= 123;
     }
+
+    return buf;
   },
 
   decode(buf) {
-    return buf;
-    if ( buf.length == 0 ) return;
+    if ( buf.length == 0 ) return buf;
 
     for( let i = 0; i < buf.length; i++ ) {
-      console.log(buf[i]);
-      //buf[i] ^= 123;
+      buf[i] ^= 123;
     }
+
+    return buf;
   }
+  */
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils };
