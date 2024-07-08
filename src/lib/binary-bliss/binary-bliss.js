@@ -39,14 +39,14 @@ class BinaryHandler {
     this.cursor = offset;
   }
 
-  _readBytes(length) {
+  _readBytes(length, opts = {}) {
     const buffer = Buffer.alloc(length);
     readSync(this.fd, buffer, 0, length, this.cursor);
     this.cursor += length;
     return buffer;
   }
 
-  _writeBytes(buffer) {
+  _writeBytes(buffer, opts = {}) {
     writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
     this.cursor += buffer.length;
   }
@@ -277,12 +277,12 @@ class BinaryHandler {
       metaLength.writeUInt32BE(buffer.length, 0);
       const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
       const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); // Fixed length for delimiter
-      this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
+      this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]), {encode: true});
     } else {
       // Fixed length string
       buffer = Buffer.alloc(len);
       buffer.write(value, 0, len, encoding);
-      this._writeBytes(buffer);
+      this._writeBytes(buffer, {encode: true});
     }
     return this;
   }
@@ -291,7 +291,7 @@ class BinaryHandler {
     const key = keyOrValue;
     if (len !== null) {
       this._ensureBytes(len);
-      const value = this._readBytes(len).toString(encoding);
+      const value = this._readBytes(len, {decode: true}).toString(encoding);
       this.reading.push({ key, value, type: 'string' });
     } else {
       // Read metadata
@@ -302,7 +302,7 @@ class BinaryHandler {
       this._ensureBytes(5); // Read delimiter
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
-      const value = this._readBytes(strLength).toString(strEncoding);
+      const value = this._readBytes(strLength, {decode: true}).toString(strEncoding);
       this.reading.push({ key, value, type: 'string' });
     }
     return this;
@@ -575,6 +575,8 @@ const BinaryTypes = {
 };
 
 const BinaryUtils = {
+  ENCODE_SHIFT: 3,
+
   padBits(bits, length) {
     while (bits.length < length) {
       bits.push(0);
@@ -584,7 +586,7 @@ const BinaryUtils = {
 
   chopBits(bits, length) {
     return bits.slice(0, length);
-  }
+  },
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils };
