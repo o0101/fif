@@ -6,6 +6,7 @@ const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
 
 function cleanUp(filePath) {
+  return;
   if (existsSync(filePath)) {
     unlinkSync(filePath);
   }
@@ -57,6 +58,8 @@ function testColorType() {
   assertEqual(color.red, readColor.red.value, 'Color red');
   assertEqual(color.green, readColor.green.value, 'Color green');
   assertEqual(color.blue, readColor.blue.value, 'Color blue');
+
+  cleanUp(filePath);
 }
 
 function testMapType() {
@@ -110,6 +113,28 @@ function testHeteroArray() {
   assertEqual(array[0], readArray[0], 'HeteroArray string');
   assertEqual(array[1], readArray[1], 'HeteroArray number');
   assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'HeteroArray date');
+
+  cleanUp(filePath);
+}
+
+function testMixedTypeArray() {
+  console.log('Testing Mixed Type Array');
+
+  const array = ['hello', 123, new Date(), { foo: 'bar' }, [1, 2, 3]];
+  const filePath = path.join(process.cwd(), 'mixedArray.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.heteroArray(array);
+  handler.jump(0);
+  const readArray = handler.heteroArray('array').value.value;
+  handler.closeFile();
+
+  assertEqual(array[0], readArray[0], 'MixedTypeArray string');
+  assertEqual(array[1], readArray[1], 'MixedTypeArray number');
+  assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'MixedTypeArray date');
+  assertEqual(array[3].foo, readArray[3].foo, 'MixedTypeArray object');
+  assertEqual(array[4].toString(), readArray[4].toString(), 'MixedTypeArray array');
 
   cleanUp(filePath);
 }
@@ -222,6 +247,36 @@ function testMagicBuffer() {
   cleanUp(filePath);
 }
 
+function testPojoType() {
+  console.log('Testing POJO Type');
+
+  const pojo = {
+    name: 'Test',
+    age: 30,
+    nested: {
+      key: 'value',
+      array: [1, 'two', new Date()]
+    }
+  };
+  const filePath = path.join(process.cwd(), 'pojo.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(pojo);
+  handler.jump(0);
+  const readPojo = handler.pojo('pojo').value.value;
+  handler.closeFile();
+
+  assertEqual(pojo.name, readPojo.name, 'POJO name');
+  assertEqual(pojo.age, readPojo.age, 'POJO age');
+  assertEqual(pojo.nested.key, readPojo.nested.key, 'POJO nested key');
+  assertEqual(pojo.nested.array[0], readPojo.nested.array[0], 'POJO nested array number');
+  assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'POJO nested array string');
+  assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO nested array date');
+
+  cleanUp(filePath);
+}
+
 function runTests() {
   testColorType();
   testBufferType();
@@ -232,6 +287,8 @@ function runTests() {
   testHeteroArray();
   testDateType();
   testFloatType();
+  testPojoType();
+  testMixedTypeArray();
 }
 
 runTests();

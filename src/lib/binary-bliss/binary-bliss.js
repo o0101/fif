@@ -1,6 +1,12 @@
 import { openSync, readSync, writeSync, closeSync, fstatSync, existsSync } from 'fs';
 import { Buffer } from 'buffer';
 
+// TODO
+/**
+  API is not fluid with value.value and 
+  needing (or not needing but suspecting we may need) to use `value${i}` in readTypeAnd
+**/
+
 class BinaryHandler {
   constructor(endian = 'BE') {
     this.endian = endian;
@@ -324,27 +330,15 @@ class BinaryHandler {
     }
   }
 
-  heteroArray(keyOrValue, length, delimiter = null) {
+  heteroArray(keyOrValue, delimiter = null) {
     if (Array.isArray(keyOrValue)) {
       const values = keyOrValue;
       this.uint32(values.length);
       for (let i = 0; i < values.length; i++) {
-        const element = values[i];
-        let type;
-        if (typeof element === 'string') {
-          type = 1;
-          this.uint8(type);
-          this.puts(element);
-        } else if (typeof element === 'number') {
-          type = 2;
-          this.uint8(type);
-          this.float(element);
-        } else if (element instanceof Date) {
-          type = 3;
-          this.uint8(type);
-          this.date(element);
+        this._writeTypeAndValue(values[i]);
+        if (delimiter && i < values.length - 1) {
+          this._writeBytes(Buffer.from(delimiter));
         }
-        // Handle other types similarly
       }
       return this;
     } else {
@@ -353,24 +347,7 @@ class BinaryHandler {
       this.uint32('length');
       const length = this.$('length').value;
       for (let i = 0; i < length; i++) {
-        this.uint8(`type_${i}`);
-        const type = this.$(`type_${i}`).value;
-        let value;
-        switch (type) {
-          case 1:
-            this.gets(`value_${i}`);
-            value = this.$(`value_${i}`).value;
-            break;
-          case 2:
-            this.float(`value_${i}`);
-            value = this.$(`value_${i}`).value;
-            break;
-          case 3:
-            this.date(`value_${i}`);
-            value = this.$(`value_${i}`).value;
-            break;
-          // Handle other types similarly
-        }
+        const value = this._readTypeAndValue();
         values.push(value);
       }
       this.reading.push({ key, value: values, type: 'heteroArray' });
@@ -384,7 +361,7 @@ class BinaryHandler {
       this.uint32(map.size);
       for (const [key, value] of map.entries()) {
         this.puts(key);
-        this.puts(value);
+        this._writeTypeAndValue(value);
       }
       return this;
     } else {
@@ -394,12 +371,83 @@ class BinaryHandler {
       const length = this.$('length').value;
       for (let i = 0; i < length; i++) {
         this.gets(`key${i}`);
-        this.gets(`value${i}`);
         const key = this.$(`key${i}`).value;
-        const value = this.$(`value${i}`).value;
+        const value = this._readTypeAndValue();
         map.set(key, value);
       }
       this.reading.push({ key, value: map, type: 'map' });
+      return this;
+    }
+  }
+
+
+  _writeTypeAndValue(value) {
+    if (typeof value === 'string') {
+      this.uint8(1);
+      this.puts(value);
+    } else if (typeof value === 'number') {
+      this.uint8(2);
+      this.float(value);
+    } else if (value instanceof Date) {
+      this.uint8(3);
+      this.date(value);
+    } else if (Array.isArray(value)) {
+      this.uint8(4);
+      this.heteroArray(value);
+    } else if (typeof value === 'object' && value !== null) {
+      this.uint8(5);
+      this.pojo(value);
+    }
+    // Handle other types similarly
+  }
+
+  _readTypeAndValue(uniq = 'value') {
+    const type = this.uint8('type').value.value;
+    let value;
+    switch (type) {
+      case 1:
+        value = this.gets(uniq).value.value;
+        break;
+      case 2:
+        value = this.float(uniq).value.value;
+        break;
+      case 3:
+        value = this.date(uniq).value.value;
+        break;
+      case 4:
+        value = this.heteroArray(uniq).value.value;
+        break;
+      case 5:
+        this.pojo(uniq);
+        value = this.$(uniq).value;
+        break;
+      // Handle other types similarly
+    }
+    return value;
+  }
+
+  pojo(keyOrValue) {
+    if (typeof keyOrValue === 'object' && keyOrValue !== null) {
+      const obj = keyOrValue;
+      const keys = Object.keys(obj);
+      this.uint32(keys.length);
+      for (const key of keys) {
+        this.puts(key);
+        this._writeTypeAndValue(obj[key]);
+      }
+      return this;
+    } else {
+      const key = keyOrValue;
+      const obj = {};
+      this.uint32('length');
+      const length = this.$('length').value;
+      for (let i = 0; i < length; i++) {
+        this.gets(`key${i}`);
+        const propKey = this.$(`key${i}`).value;
+        const value = this._readTypeAndValue();
+        obj[propKey] = value;
+      }
+      this.reading.push({ key, value: obj, type: 'pojo' });
       return this;
     }
   }
@@ -496,7 +544,7 @@ class BinaryHandler {
   }
 
   $(searchKey) {
-    return this.reading.find(item => item.key === searchKey) || null;
+    return this.reading.findLast(item => item.key === searchKey) || null;
   }
 }
 
@@ -540,4 +588,3 @@ const BinaryUtils = {
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils };
-
