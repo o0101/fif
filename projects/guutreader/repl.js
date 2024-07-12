@@ -42,7 +42,7 @@ export async function startRepl() {
     try {
       const command = readlineSync.question('> ');
 
-      if (command === 'help') {
+      if (command === 'help' || command === 'h') {
         displayHelp();
       } else if (command.startsWith('search ') || command.startsWith('s ')) {
         command.trim().split(/\s+/g).shift();

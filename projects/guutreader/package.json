@@ -1,6 +1,6 @@
 {
   "name": "guutreader",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "description": "Project Gutenberg Reader with binary storage and bookmarking",
   "main": "index.js",
@@ -9,7 +9,6 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prePublishOnly": "cp ../../src/lib/binary-bliss/binary-bliss.js .",
     "start": "node index.js"
   },
   "repository": {
