@@ -8,7 +8,7 @@ const booksDir = 'books';
 let searchResults = [];
 let library = [];
 let currentPage = 0;
-const linesPerPage = 20;
+const linesPerPage = process.stdout.rows - 2 || 21;
 
 // Ensure the books directory exists
 if (!existsSync(booksDir)) {
@@ -19,7 +19,7 @@ if (!existsSync(booksDir)) {
 function loadLibrary() {
   const files = readdirSync(booksDir);
   files.forEach(file => {
-    if ( !file.endsWith('.bin') ) continue;
+    if ( !file.endsWith('.bin') ) return;
     const bookId = path.parse(file).name;
     const binaryHandler = new BinaryHandler();
     binaryHandler.openFile(path.join(booksDir, file));
