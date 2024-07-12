@@ -1,6 +1,6 @@
 {
   "name": "guutreader",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "description": "Project Gutenberg Reader with binary storage and bookmarking",
   "main": "index.js",

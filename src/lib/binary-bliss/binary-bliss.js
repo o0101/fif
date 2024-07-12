@@ -599,6 +599,31 @@ class BinaryHandler {
   $(searchKey) {
     return this.reading.findLast(item => item.key === searchKey) || null;
   }
+
+  readTranscript(format) {
+    const result = [];
+    this.jump(0);
+
+    format.split('.').forEach(command => {
+      const match = command.match(/(\w+)\(([^)]*)\)/);
+      if (match) {
+        const method = match[1];
+        const args = match[2].split(',').map(arg => arg.trim().replace(/['"]/g, ''));
+        if (typeof this[method] === 'function') {
+          const beforeCursor = this.cursor;
+          this[method](...args);
+          const afterCursor = this.cursor;
+          const buffer = this._readBytes(afterCursor - beforeCursor);
+          const hexData = buffer.toString('hex').match(/.{1,2}/g).join(' ');
+          result.push(`${hexData}\t${method}(${args.join(', ')}): ${JSON.stringify(this.value.value)}`);
+        }
+      }
+    });
+
+    console.log('READ TRANSCRIPT');
+    console.log('===========================');
+    result.forEach(line => console.log(line));
+  }
 }
 
 const BinaryTypes = {
