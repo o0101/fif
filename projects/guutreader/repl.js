@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readdirSync } from 'fs';
 import path from 'path';
 
 const booksDir = 'books';
-let searchResults;
+let searchResults = [];
 let library = [];
 let currentPage = 0;
 const linesPerPage = 20;
@@ -40,15 +40,14 @@ export async function startRepl() {
     if (command.startsWith('search ')) {
       const query = command.slice(7);
       const results = await searchBooks(query);
-      searchResults = results;
+      searchResults = results; // Store the search results
       displayResults(results);
     } else if (command.startsWith('download ')) {
       const resultIndex = parseInt(command.slice(9)) - 1;
       if (resultIndex >= 0 && resultIndex < searchResults.length) {
         const book = searchResults[resultIndex];
         const bookId = book.id;
-        const bookText = await downloadBook(bookId);
-        saveBook(book, bookText);
+        await saveBook(book, bookId);
       } else {
         console.log('Invalid index');
       }
@@ -81,8 +80,8 @@ function displayResults(results) {
   });
 }
 
-async function saveBook(book, bookText) {
-  const metadata = { bookId: book.id, title: book.title, author: book.authors.map(author => author.name).join(', ') };
+async function saveBook(book, bookId) {
+  const metadata = { title: book.title, author: book.authors.map(author => author.name).join(', ') };
 
   console.log('Downloading book...');
   const bookText = await downloadBook(bookId, progress => {
@@ -101,6 +100,11 @@ async function saveBook(book, bookText) {
 }
 
 function displayLibrary() {
+  if (library.length === 0) {
+    console.log('No books in library.');
+    return;
+  }
+
   library.forEach((book, index) => {
     console.log(`${index + 1}. [ID: ${book.bookId}] ${book.metadata.title} by ${book.metadata.author}`);
   });
