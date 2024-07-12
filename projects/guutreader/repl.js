@@ -19,6 +19,7 @@ if (!existsSync(booksDir)) {
 function loadLibrary() {
   const files = readdirSync(booksDir);
   files.forEach(file => {
+    if ( !file.endsWith('.bin') ) continue;
     const bookId = path.parse(file).name;
     const binaryHandler = new BinaryHandler();
     binaryHandler.openFile(path.join(booksDir, file));
