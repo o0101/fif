@@ -36,13 +36,17 @@ loadLibrary();
 
 export async function startRepl() {
   console.log('Welcome to the Project Gutenberg Reader');
+  console.log('Type "help" to see available commands.');
 
   while (true) {
     try {
       const command = readlineSync.question('> ');
 
-      if (command.startsWith('search ')) {
-        const query = command.slice(7);
+      if (command === 'help') {
+        displayHelp();
+      } else if (command.startsWith('search ') || command.startsWith('s ')) {
+        command.trim().split(/\s+/g).shift();
+        const query = command.join(' ');
         const results = await searchBooks(query);
         searchResults = results; // Store the search results
         displayResults(results);
@@ -66,15 +70,29 @@ export async function startRepl() {
         nextPage();
       } else if (command === 'p') {
         previousPage();
-      } else if (command === 'quit' || command == 'q') {
+      } else if (command === 'quit' || command === 'q') {
         break;
       } else {
         console.log('Unknown command');
       }
-    } catch(e) {
-      console.warn('That was an error', e);
+    } catch (e) {
+      console.warn('There was an error', e);
     }
   }
+}
+
+function displayHelp() {
+  console.log(`
+Available commands:
+  help               - Display this help message
+  search <query>     - Search for books by title, author, or topic
+  download <number>  - Download a book from the search results
+  library            - Display your library of downloaded books
+  read <number>      - Read a book from your library
+  n                  - Next page
+  p                  - Previous page
+  quit               - Quit the reader
+  `);
 }
 
 function displayResults(results) {
@@ -82,7 +100,7 @@ function displayResults(results) {
     console.log('No results found.');
     return;
   }
-  
+
   results.forEach((book, index) => {
     console.log(`${index + 1}. [ID: ${book.id}] ${book.title} by ${book.authors.map(author => author.name).join(', ')}`);
   });
@@ -92,8 +110,13 @@ async function saveBook(book, bookId) {
   const metadata = { title: book.title, author: book.authors.map(author => author.name).join(', ') };
 
   console.log('Downloading book...');
-  const bookText = await downloadBook(bookId, progress => {
-    process.stdout.write(`Downloaded: ${progress} bytes\r`);
+  const bookText = await downloadBook(bookId, (progress, total) => {
+    if (total) {
+      const percent = ((progress / total) * 100).toFixed(2);
+      process.stdout.write(`Downloaded: ${progress} bytes (${percent}%)\r`);
+    } else {
+      process.stdout.write(`Downloaded: ${progress} bytes\r`);
+    }
   });
 
   const binaryHandler = new BinaryHandler();
