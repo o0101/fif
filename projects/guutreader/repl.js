@@ -1,6 +1,6 @@
 import readlineSync from 'readline-sync';
+import { BinaryHandler } from 'binary-bliss';
 import { searchBooks, downloadBook } from './gutenberg.js';
-import { BinaryHandler } from '../../src/lib/binary-bliss/binary-bliss.js';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
 import path from 'path';
 

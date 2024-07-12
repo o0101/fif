@@ -1,6 +1,6 @@
 {
   "name": "guutreader",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "Project Gutenberg Reader with binary storage and bookmarking",
   "main": "index.js",
@@ -9,11 +9,12 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "prePublishOnly": "cp ../../src/lib/binary-bliss/binary-bliss.js .",
     "start": "node index.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fif/fif.git"
+    "url": "git+https://github.com/o0101/fif.git"
   },
   "keywords": [
     "gutenberg",
@@ -26,6 +27,7 @@
   "license": "Beerware",
   "dependencies": {
     "axios": "^1.7.2",
+    "binary-bliss": "^1.0.1",
     "readline-sync": "^1.4.10"
   }
 }
