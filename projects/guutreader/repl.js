@@ -45,8 +45,9 @@ export async function startRepl() {
       if (command === 'help' || command === 'h') {
         displayHelp();
       } else if (command.startsWith('search ') || command.startsWith('s ')) {
-        command.trim().split(/\s+/g).shift();
-        const query = command.join(' ');
+        const parts = command.trim().split(/\s+/g);
+        parts.shift();
+        const query = parts.join(' ');
         const results = await searchBooks(query);
         searchResults = results; // Store the search results
         displayResults(results);
@@ -102,7 +103,7 @@ function displayResults(results) {
   }
 
   results.forEach((book, index) => {
-    console.log(`${index + 1}. [ID: ${book.id}] ${book.title} by ${book.authors.map(author => author.name).join(', ')}`);
+    console.log(`${index + 1}. ${book.title} by ${book.authors.map(author => author.name).join(', ')}`);
   });
 }
 
