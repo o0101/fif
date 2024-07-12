@@ -1,0 +1,27 @@
+{
+  "name": "binary-bliss",
+  "version": "1.0.0",
+  "main": "binary-bliss.js",
+  "module": "binary-bliss.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/o0101/fif.git"
+  },
+  "keywords": [
+    "binary",
+    "file",
+    "read",
+    "write"
+  ],
+  "author": "@dosy",
+  "license": "Polyform-NonCommercial-1.0",
+  "bugs": {
+    "url": "https://github.com/o0101/fif/issues"
+  },
+  "homepage": "https://github.com/o0101/fif#readme",
+  "description": ""
+}
