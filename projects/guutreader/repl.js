@@ -9,6 +9,7 @@ let searchResults = [];
 let library = [];
 let currentPage = 0;
 const linesPerPage = process.stdout.rows - 2 || 21;
+let currentBookId = null; // Track the current book being read
 
 // Ensure the books directory exists
 if (!existsSync(booksDir)) {
@@ -19,11 +20,12 @@ if (!existsSync(booksDir)) {
 function loadLibrary() {
   const files = readdirSync(booksDir);
   files.forEach(file => {
-    if ( !file.endsWith('.bin') ) return;
+    if (!file.endsWith('.bin')) return;
     const bookId = path.parse(file).name;
     const binaryHandler = new BinaryHandler();
     binaryHandler.openFile(path.join(booksDir, file));
     binaryHandler.readMagic('GR');
+    binaryHandler.uint32('bookmark');
     const metadata = binaryHandler.pojo('metadata').value.value;
     library.push({ bookId, metadata });
     binaryHandler.closeFile();
@@ -36,36 +38,41 @@ export async function startRepl() {
   console.log('Welcome to the Project Gutenberg Reader');
 
   while (true) {
-    const command = readlineSync.question('> ');
+    try {
+      const command = readlineSync.question('> ');
 
-    if (command.startsWith('search ')) {
-      const query = command.slice(7);
-      const results = await searchBooks(query);
-      searchResults = results; // Store the search results
-      displayResults(results);
-    } else if (command.startsWith('download ')) {
-      const resultIndex = parseInt(command.slice(9)) - 1;
-      if (resultIndex >= 0 && resultIndex < searchResults.length) {
-        const book = searchResults[resultIndex];
-        const bookId = book.id;
-        await saveBook(book, bookId);
+      if (command.startsWith('search ')) {
+        const query = command.slice(7);
+        const results = await searchBooks(query);
+        searchResults = results; // Store the search results
+        displayResults(results);
+      } else if (command.startsWith('download ') || command.startsWith('d ')) {
+        const resultIndex = parseInt(command.trim().split(/\s+/g).pop()) - 1;
+        if (resultIndex >= 0 && resultIndex < searchResults.length) {
+          const book = searchResults[resultIndex];
+          const bookId = book.id;
+          await saveBook(book, bookId);
+        } else {
+          console.log('Invalid index');
+        }
+      } else if (command === 'library' || command === 'l') {
+        displayLibrary();
+      } else if (command.startsWith('read ') || command.startsWith('r ')) {
+        const libraryId = command.trim().split(/\s+/g).pop();
+        const bookId = library[parseInt(libraryId) - 1].bookId;
+        currentBookId = bookId; // Track the current book
+        readBook(bookId);
+      } else if (command === 'n') {
+        nextPage();
+      } else if (command === 'p') {
+        previousPage();
+      } else if (command === 'quit' || command == 'q') {
+        break;
       } else {
-        console.log('Invalid index');
+        console.log('Unknown command');
       }
-    } else if (command === 'library') {
-      displayLibrary();
-    } else if (command.startsWith('read ')) {
-      const libraryId = command.slice(5);
-      const bookId = library[parseInt(libraryId) - 1].bookId;
-      readBook(bookId);
-    } else if (command === 'n') {
-      nextPage();
-    } else if (command === 'p') {
-      previousPage();
-    } else if (command === 'quit') {
-      break;
-    } else {
-      console.log('Unknown command');
+    } catch(e) {
+      console.warn('That was an error', e);
     }
   }
 }
@@ -92,6 +99,7 @@ async function saveBook(book, bookId) {
   const binaryHandler = new BinaryHandler();
   binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
   binaryHandler.writeMagic('GR');
+  binaryHandler.uint32(0); // Initialize bookmark
   binaryHandler.pojo(metadata);
   binaryHandler.puts(bookText);
   binaryHandler.closeFile();
@@ -107,7 +115,7 @@ function displayLibrary() {
   }
 
   library.forEach((book, index) => {
-    console.log(`${index + 1}. [ID: ${book.bookId}] ${book.metadata.title} by ${book.metadata.author}`);
+    console.log(`${index + 1}. ${book.metadata.title} by ${book.metadata.author}`);
   });
 }
 
@@ -115,13 +123,13 @@ function readBook(bookId) {
   const binaryHandler = new BinaryHandler();
   binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
   binaryHandler.readMagic('GR');
-  binaryHandler.pojo('metadata');
+  currentPage = binaryHandler.uint32('bookmark').value.value; // Read the bookmark
+  const metadata = binaryHandler.pojo('metadata').value.value;
   const bookText = binaryHandler.gets('bookText').value.value;
   binaryHandler.closeFile();
 
   // Split the book text into pages
   global.bookPages = bookText.split('\n');
-  global.currentPage = 0;
 
   displayPage();
 }
@@ -133,10 +141,19 @@ function displayPage() {
   console.log(pageContent);
 }
 
+function saveBookmark(bookId) {
+  const binaryHandler = new BinaryHandler();
+  binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
+  binaryHandler.readMagic('GR');
+  binaryHandler.uint32(currentPage); // Update bookmark
+  binaryHandler.closeFile();
+}
+
 function nextPage() {
   if ((currentPage + 1) * linesPerPage < global.bookPages.length) {
     currentPage++;
     displayPage();
+    saveBookmark(currentBookId);
   } else {
     console.log('You are at the end of the book.');
   }
@@ -146,6 +163,7 @@ function previousPage() {
   if (currentPage > 0) {
     currentPage--;
     displayPage();
+    saveBookmark(currentBookId);
   } else {
     console.log('You are at the beginning of the book.');
   }
