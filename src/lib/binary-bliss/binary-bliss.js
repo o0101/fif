@@ -1,4 +1,4 @@
-import { openSync, readSync, writeSync, closeSync, fstatSync, existsSync } from 'fs';
+import { openSync, readSync, writeSync, closeSync, fstatSync, statSync, existsSync } from 'fs';
 import { Buffer } from 'buffer';
 
 // TODO
@@ -27,7 +27,13 @@ class BinaryHandler {
   }
 
   openFile(filePath) {
-    this.fd = openSync(filePath, existsSync(filePath) ? 'r+' : 'w+');
+    if (!existsSync(filePath)) {
+      this.fd = openSync(filePath, 'w+');
+    } else {
+      const stats = statSync(filePath);
+      const isWritable = (stats.mode & 0o200) !== 0;
+      this.fd = openSync(filePath, isWritable ? 'r+' : 'r');
+    }
     return this;
   }
 
