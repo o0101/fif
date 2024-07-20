@@ -1,4 +1,4 @@
-import readlineSync from 'readline-sync';
+import readline from 'readline';
 import { BinaryHandler } from 'binary-bliss';
 import { searchBooks, downloadBook } from './gutenberg.js';
 import { existsSync, mkdirSync, readdirSync } from 'fs';
@@ -10,6 +10,7 @@ let library = [];
 let currentPage = 0;
 const linesPerPage = process.stdout.rows - 2 || 21;
 let currentBookId = null; // Track the current book being read
+let lineOffset = 0; // Track the line offset for one-line scrolling
 
 // Ensure the books directory exists
 if (!existsSync(booksDir)) {
@@ -38,9 +39,33 @@ export async function startRepl() {
   console.log('Welcome to the Project Gutenberg Reader');
   console.log('Type "help" to see available commands.');
 
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+
+  process.stdin.on('keypress', (str, key) => {
+    if (key.name === 'up') {
+      previousLine();
+    } else if (key.name === 'down') {
+      nextLine();
+    } else if (key.name === 'right') {
+      nextPage();
+    } else if (key.name === 'left') {
+      previousPage();
+    } else if (key.sequence === '\u0003') {
+      // Handle Ctrl+C
+      rl.close();
+      process.exit();
+    }
+  });
+
   while (true) {
     try {
-      const command = readlineSync.question('> ');
+      const command = await new Promise(resolve => rl.question('> ', resolve));
 
       if (command === 'help' || command === 'h') {
         displayHelp();
@@ -72,6 +97,7 @@ export async function startRepl() {
       } else if (command === 'p') {
         previousPage();
       } else if (command === 'quit' || command === 'q') {
+        rl.close();
         break;
       } else {
         console.log('Unknown command');
@@ -159,7 +185,7 @@ function readBook(bookId) {
 }
 
 function displayPage() {
-  const start = currentPage * linesPerPage;
+  const start = currentPage * linesPerPage + lineOffset;
   const end = start + linesPerPage;
   const pageContent = global.bookPages.slice(start, end).join('\n');
   console.log(pageContent);
@@ -176,6 +202,7 @@ function saveBookmark(bookId) {
 function nextPage() {
   if ((currentPage + 1) * linesPerPage < global.bookPages.length) {
     currentPage++;
+    lineOffset = 0;
     displayPage();
     saveBookmark(currentBookId);
   } else {
@@ -186,6 +213,35 @@ function nextPage() {
 function previousPage() {
   if (currentPage > 0) {
     currentPage--;
+    lineOffset = 0;
+    displayPage();
+    saveBookmark(currentBookId);
+  } else {
+    console.log('You are at the beginning of the book.');
+  }
+}
+
+function nextLine() {
+  if ((currentPage * linesPerPage + lineOffset + linesPerPage) < global.bookPages.length) {
+    lineOffset++;
+    if (lineOffset >= linesPerPage) {
+      currentPage++;
+      lineOffset = 0;
+    }
+    displayPage();
+    saveBookmark(currentBookId);
+  } else {
+    console.log('You are at the end of the book.');
+  }
+}
+
+function previousLine() {
+  if (currentPage > 0 || lineOffset > 0) {
+    lineOffset--;
+    if (lineOffset < 0) {
+      currentPage--;
+      lineOffset = linesPerPage - 1;
+    }
     displayPage();
     saveBookmark(currentBookId);
   } else {
