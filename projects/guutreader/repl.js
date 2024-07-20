@@ -1,39 +1,16 @@
 import readline from 'readline';
-import { BinaryHandler } from 'binary-bliss';
 import { searchBooks, downloadBook } from './gutenberg.js';
-import { existsSync, mkdirSync, readdirSync } from 'fs';
+import { libraryDir, loadLibrary, saveBookmark, readBook } from './library.js';
 import path from 'path';
+import { BinaryHandler } from 'binary-bliss';
+import { existsSync, mkdirSync } from 'fs';
 
-const booksDir = 'books';
 let searchResults = [];
-let library = [];
+let library = loadLibrary();
 let currentPage = 0;
 const linesPerPage = process.stdout.rows - 2 || 21;
 let currentBookId = null; // Track the current book being read
 let lineOffset = 0; // Track the line offset for one-line scrolling
-
-// Ensure the books directory exists
-if (!existsSync(booksDir)) {
-  mkdirSync(booksDir);
-}
-
-// Load the library from the books directory
-function loadLibrary() {
-  const files = readdirSync(booksDir);
-  files.forEach(file => {
-    if (!file.endsWith('.bin')) return;
-    const bookId = path.parse(file).name;
-    const binaryHandler = new BinaryHandler();
-    binaryHandler.openFile(path.join(booksDir, file));
-    binaryHandler.readMagic('GR');
-    binaryHandler.uint32('bookmark');
-    const metadata = binaryHandler.pojo('metadata').value.value;
-    library.push({ bookId, metadata });
-    binaryHandler.closeFile();
-  });
-}
-
-loadLibrary();
 
 export async function startRepl() {
   console.log('Welcome to the Project Gutenberg Reader');
@@ -91,7 +68,10 @@ export async function startRepl() {
         const libraryId = command.trim().split(/\s+/g).pop();
         const bookId = library[parseInt(libraryId) - 1].bookId;
         currentBookId = bookId; // Track the current book
-        readBook(bookId);
+        const { currentPage: savedPage, bookText } = readBook(bookId);
+        currentPage = savedPage;
+        global.bookPages = bookText.split('\n');
+        displayPage();
       } else if (command === 'n') {
         nextPage();
       } else if (command === 'p') {
@@ -147,7 +127,7 @@ async function saveBook(book, bookId) {
   });
 
   const binaryHandler = new BinaryHandler();
-  binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
+  binaryHandler.openFile(path.join(libraryDir, `${bookId}.bin`));
   binaryHandler.writeMagic('GR');
   binaryHandler.uint32(0); // Initialize bookmark
   binaryHandler.pojo(metadata);
@@ -169,21 +149,6 @@ function displayLibrary() {
   });
 }
 
-function readBook(bookId) {
-  const binaryHandler = new BinaryHandler();
-  binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
-  binaryHandler.readMagic('GR');
-  currentPage = binaryHandler.uint32('bookmark').value.value; // Read the bookmark
-  const metadata = binaryHandler.pojo('metadata').value.value;
-  const bookText = binaryHandler.gets('bookText').value.value;
-  binaryHandler.closeFile();
-
-  // Split the book text into pages
-  global.bookPages = bookText.split('\n');
-
-  displayPage();
-}
-
 function displayPage() {
   const start = currentPage * linesPerPage + lineOffset;
   const end = start + linesPerPage;
@@ -191,20 +156,12 @@ function displayPage() {
   console.log(pageContent);
 }
 
-function saveBookmark(bookId) {
-  const binaryHandler = new BinaryHandler();
-  binaryHandler.openFile(path.join(booksDir, `${bookId}.bin`));
-  binaryHandler.readMagic('GR');
-  binaryHandler.uint32(currentPage); // Update bookmark
-  binaryHandler.closeFile();
-}
-
 function nextPage() {
   if ((currentPage + 1) * linesPerPage < global.bookPages.length) {
     currentPage++;
     lineOffset = 0;
     displayPage();
-    saveBookmark(currentBookId);
+    saveBookmark(currentBookId, currentPage);
   } else {
     console.log('You are at the end of the book.');
   }
@@ -215,7 +172,7 @@ function previousPage() {
     currentPage--;
     lineOffset = 0;
     displayPage();
-    saveBookmark(currentBookId);
+    saveBookmark(currentBookId, currentPage);
   } else {
     console.log('You are at the beginning of the book.');
   }
@@ -229,7 +186,7 @@ function nextLine() {
       lineOffset = 0;
     }
     displayPage();
-    saveBookmark(currentBookId);
+    saveBookmark(currentBookId, currentPage);
   } else {
     console.log('You are at the end of the book.');
   }
@@ -243,7 +200,7 @@ function previousLine() {
       lineOffset = linesPerPage - 1;
     }
     displayPage();
-    saveBookmark(currentBookId);
+    saveBookmark(currentBookId, currentPage);
   } else {
     console.log('You are at the beginning of the book.');
   }
