@@ -86,7 +86,7 @@ function testMapType() {
   handler.map(map);
   handler.jump(0);
   handler.readMagic('MAP');
-  const readMap = handler.map('map').value.value;
+  const readMap = handler.map('map').last.value;
   handler.closeFile();
 
   assertEqual(map.size, readMap.size, 'Map size');
@@ -107,7 +107,7 @@ function testHeteroArray() {
   handler.openFile(filePath);
   handler.heteroArray(array);
   handler.jump(0);
-  const readArray = handler.heteroArray('array').value.value;
+  const readArray = handler.heteroArray('array').last.value;
   handler.closeFile();
 
   assertEqual(array[0], readArray[0], 'HeteroArray string');
@@ -127,7 +127,7 @@ function testMixedTypeArray() {
   handler.openFile(filePath);
   handler.heteroArray(array);
   handler.jump(0);
-  const readArray = handler.heteroArray('array').value.value;
+  const readArray = handler.heteroArray('array').last.value;
   handler.closeFile();
 
   assertEqual(array[0], readArray[0], 'MixedTypeArray string');
@@ -149,7 +149,7 @@ function testDateType() {
   handler.openFile(filePath);
   handler.date(date);
   handler.jump(0);
-  const readDate = handler.date('date').value.value;
+  const readDate = handler.date('date').last.value;
   handler.closeFile();
 
   assertEqual(date.toISOString(), readDate.toISOString(), 'Date value');
@@ -167,7 +167,7 @@ function testFloatType() {
   handler.openFile(filePath);
   handler.float(float);
   handler.jump(0);
-  const readFloat = handler.float('float').value.value;
+  const readFloat = handler.float('float').last.value;
   handler.closeFile();
 
   assertEqual(float.toFixed(3), readFloat.toFixed(3), 'Float value');
@@ -206,7 +206,7 @@ function testMagicNumber() {
   handler.readMagic(magicNumber);    // Reading magic number
   handler.closeFile();
 
-  assertEqual(magicNumber, handler.value.value, 'Magic number');
+  assertEqual(magicNumber, handler.last.value, 'Magic number');
 
   cleanUp(filePath);
 }
@@ -224,7 +224,7 @@ function testMagicString() {
   handler.readMagic(magicString);    // Reading magic string
   handler.closeFile();
 
-  assertEqual(magicString, handler.value.value, 'Magic string');
+  assertEqual(magicString, handler.last.value, 'Magic string');
 
   cleanUp(filePath);
 }
@@ -264,7 +264,7 @@ function testPojoType() {
   handler.openFile(filePath);
   handler.pojo(pojo);
   handler.jump(0);
-  const readPojo = handler.pojo('pojo').value.value;
+  const readPojo = handler.pojo('pojo').last.value;
   handler.closeFile();
 
   assertEqual(pojo.name, readPojo.name, 'POJO name');
@@ -295,7 +295,7 @@ function testComplexNonLatinObject() {
   handler.openFile(filePath);
   handler.pojo(complexObject);
   handler.jump(0);
-  const readObject = handler.pojo('complexObject').value.value;
+  const readObject = handler.pojo('complexObject').last.value;
   handler.closeFile();
 
   assertEqual(complexObject.greeting, readObject.greeting, 'Complex object greeting');
@@ -320,7 +320,7 @@ function testMapWithPojo() {
   handler.openFile(filePath);
   handler.map(mapWithPojo);
   handler.jump(0);
-  const readMap = handler.map('mapWithPojo').value.value;
+  const readMap = handler.map('mapWithPojo').last.value;
   handler.closeFile();
 
   assertEqual(mapWithPojo.size, readMap.size, 'Map with POJO size');
@@ -348,7 +348,7 @@ function testPojoWithMap() {
   handler.openFile(filePath);
   handler.pojo(pojoWithMap);
   handler.jump(0);
-  const readPojo = handler.pojo('pojoWithMap').value.value;
+  const readPojo = handler.pojo('pojoWithMap').last.value;
   handler.closeFile();
 
   assertEqual(pojoWithMap.name, readPojo.name, 'POJO with Map name');
@@ -369,7 +369,7 @@ function testSetType() {
   handler.openFile(filePath);
   handler.set(set);
   handler.jump(0);
-  const readSet = handler.set('set').value.value;
+  const readSet = handler.set('set').last.value;
   handler.closeFile();
 
   const setArray = Array.from(set);
@@ -401,7 +401,7 @@ function testPojoWithSet() {
   handler.openFile(filePath);
   handler.pojo(pojoWithSet);
   handler.jump(0);
-  const readPojo = handler.pojo('pojoWithSet').value.value;
+  const readPojo = handler.pojo('pojoWithSet').last.value;
   handler.closeFile();
 
   assertEqual(pojoWithSet.name, readPojo.name, 'POJO with Set name');
@@ -430,7 +430,7 @@ function testSetWithPojo() {
   handler.openFile(filePath);
   handler.set(setWithPojo);
   handler.jump(0);
-  const readSet = handler.set('setWithPojo').value.value;
+  const readSet = handler.set('setWithPojo').last.value;
   handler.closeFile();
 
   const setArray = Array.from(setWithPojo);

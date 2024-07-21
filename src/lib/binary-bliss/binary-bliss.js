@@ -467,20 +467,20 @@ class BinaryHandler {
   }
 
   _readTypeAndValue(uniq = 'value') {
-    const type = this.uint8('type').value.value;
+    const type = this.uint8('type').last.value;
     let value;
     switch (type) {
       case 1:
-        value = this.gets(uniq).value.value;
+        value = this.gets(uniq).last.value;
         break;
       case 2:
-        value = this.float(uniq).value.value;
+        value = this.float(uniq).last.value;
         break;
       case 3:
-        value = this.date(uniq).value.value;
+        value = this.date(uniq).last.value;
         break;
       case 4:
-        value = this.heteroArray(uniq).value.value;
+        value = this.heteroArray(uniq).last.value;
         break;
       case 5:
         this.pojo(uniq);
@@ -636,7 +636,7 @@ class BinaryHandler {
     return result;
   }
 
-  get value() {
+  get last() {
     return this.reading.length ? this.reading[this.reading.length - 1] : null;
   }
 
@@ -659,7 +659,7 @@ class BinaryHandler {
           const afterCursor = this.cursor;
           const buffer = this._readBytes(afterCursor - beforeCursor);
           const hexData = buffer.toString('hex').match(/.{1,2}/g).join(' ');
-          result.push(`${hexData}\t${method}(${args.join(', ')}): ${JSON.stringify(this.value.value)}`);
+          result.push(`${hexData}\t${method}(${args.join(', ')}): ${JSON.stringify(this.last.value)}`);
         }
       }
     });
