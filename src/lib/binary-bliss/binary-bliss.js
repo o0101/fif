@@ -69,13 +69,6 @@ class BinaryHandler {
     }
   }
 
-  _ensureWriteSpace(buffer) {
-    const stats = fstatSync(this.fd);
-    if (this.cursor + buffer.length > stats.size) {
-      throw new Error('Insufficient space in file for writing');
-    }
-  }
-
   _readBytes(length, opts = {}) {
     try {
       this._validateLength(length);
@@ -96,7 +89,6 @@ class BinaryHandler {
   _writeBytes(buffer, opts = {}) {
     try {
       this._validateBuffer(buffer);
-      this._ensureWriteSpace(buffer);
       if (opts.encode && ETEXT) {
         BinaryUtils.encode(buffer);
       }
