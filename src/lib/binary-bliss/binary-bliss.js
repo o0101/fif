@@ -71,7 +71,8 @@ class BinaryHandler {
 
   _readBytes(length, opts = {}) {
     try {
-      this._validateLength(length);
+      this._validateLength(length); // Validate the length
+      this._ensureBytes(length); // Ensure sufficient data
       const buffer = Buffer.alloc(length);
       readSync(this.fd, buffer, 0, length, this.cursor);
       if (opts.decode && ETEXT) {
@@ -309,10 +310,10 @@ class BinaryHandler {
   puts(value, len = null, encoding = 'utf8', delimiter = null) {
     let buffer;
 
-    value = ATextEncoder.encode(value);
+    const encodedValue = ATextEncoder.encode(value);
     if (len === null) {
       // Non-fixed length string with metadata
-      buffer = Buffer.from(value, encoding);
+      buffer = Buffer.from(encodedValue, encoding);
       const metaLength = Buffer.alloc(4);
       metaLength.writeUInt32BE(buffer.length, 0);
       const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
@@ -324,6 +325,7 @@ class BinaryHandler {
       this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
     } else {
       // Fixed length string
+      this._validateLength(len); // Validate the length
       buffer = Buffer.alloc(len);
       buffer.write(value, 0, len, encoding);
       console.log('encode', buffer);
@@ -335,28 +337,30 @@ class BinaryHandler {
   gets(keyOrValue, len = null, encoding = 'utf8', delimiter = null) {
     const key = keyOrValue;
     if (len !== null) {
+      this._validateLength(len); // Validate the length
       this._ensureBytes(len);
       let value = this._readBytes(len, { decode: true }).toString(encoding);
-      value = ATextDecoder.decode(value.buffer.slice(0, buffer.length));
+      value = ATextDecoder.decode(value.buffer.slice(0, value.length));
       this.reading.push({ key, value, type: 'string' });
     } else {
       // Read metadata
       this._ensureBytes(4); // Read length
       const strLength = this._readBytes(4).readUInt32BE(0);
+      this._validateLength(strLength); // Validate the length
       this._ensureBytes(5); // Read encoding
       const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(5); // Read delimiter
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
       let value = this._readBytes(strLength, { decode: true });
-      value = ATextDecoder.decode(value.buffer.slice(0, value.buffer.length));
+      value = ATextDecoder.decode(value.buffer.slice(0, value.length));
       this.reading.push({ key, value, type: 'string' });
     }
     return this;
   }
 
   array(keyOrValue, length, type, delimiter = null) {
-    this._validateLength(length);
+    this._validateLength(length); // Validate the length
     if (Array.isArray(keyOrValue)) {
       const values = keyOrValue;
       for (let i = 0; i < values.length; i++) {
