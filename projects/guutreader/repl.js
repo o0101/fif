@@ -117,25 +117,34 @@ async function saveBook(book, bookId) {
   const metadata = { title: book.title, author: book.authors.map(author => author.name).join(', ') };
 
   console.log('Downloading book...');
-  const bookText = await downloadBook(bookId, (progress, total) => {
-    if (total) {
-      const percent = ((progress / total) * 100).toFixed(2);
-      process.stdout.write(`Downloaded: ${progress} bytes (${percent}%)\r`);
-    } else {
-      process.stdout.write(`Downloaded: ${progress} bytes\r`);
+  try {
+    const bookText = await downloadBook(bookId, (progress, total) => {
+      if (total) {
+        const percent = ((progress / total) * 100).toFixed(2);
+        process.stdout.write(`Downloaded: ${progress} bytes (${percent}%)\r`);
+      } else {
+        process.stdout.write(`Downloaded: ${progress} bytes\r`);
+      }
+    });
+
+    if (!bookText) {
+      throw new Error('Download failed');
     }
-  });
 
-  const binaryHandler = new BinaryHandler();
-  binaryHandler.openFile(path.join(libraryDir, `${bookId}.bin`));
-  binaryHandler.writeMagic('GR');
-  binaryHandler.uint32(0); // Initialize bookmark
-  binaryHandler.pojo(metadata);
-  binaryHandler.puts(bookText);
-  binaryHandler.closeFile();
+    const binaryHandler = new BinaryHandler();
+    const filePath = path.join(libraryDir, `${bookId}.bin`);
+    binaryHandler.openFile(filePath);
+    binaryHandler.writeMagic('GR');
+    binaryHandler.uint32(0); // Initialize bookmark
+    binaryHandler.pojo(metadata);
+    binaryHandler.puts(bookText);
+    binaryHandler.closeFile();
 
-  library.push({ bookId, metadata });
-  console.log('\nDownload complete.');
+    library.push({ bookId, metadata });
+    console.log('\nDownload complete.');
+  } catch (error) {
+    console.error('\nError downloading book:', error.message);
+  }
 }
 
 function displayLibrary() {

@@ -21,7 +21,7 @@ function loadLibrary() {
     binaryHandler.openFile(path.join(libraryDir, file));
     binaryHandler.readMagic('GR');
     binaryHandler.uint32('bookmark');
-    const metadata = binaryHandler.pojo('metadata').value.value;
+    const metadata = binaryHandler.pojo('metadata').last.value;
     library.push({ bookId, metadata });
     binaryHandler.closeFile();
   });
@@ -40,9 +40,9 @@ function readBook(bookId) {
   const binaryHandler = new BinaryHandler();
   binaryHandler.openFile(path.join(libraryDir, `${bookId}.bin`));
   binaryHandler.readMagic('GR');
-  const currentPage = binaryHandler.uint32('bookmark').value.value; // Read the bookmark
-  const metadata = binaryHandler.pojo('metadata').value.value;
-  const bookText = binaryHandler.gets('bookText').value.value;
+  const currentPage = binaryHandler.uint32('bookmark').last.value; // Read the bookmark
+  const metadata = binaryHandler.pojo('metadata').last.value;
+  const bookText = binaryHandler.gets('bookText').last.value;
   binaryHandler.closeFile();
   return { currentPage, metadata, bookText };
 }
