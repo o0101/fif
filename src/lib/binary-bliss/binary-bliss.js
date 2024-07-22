@@ -66,15 +66,13 @@ class BinaryHandler {
 
     // Read the file content excluding the signature (assume last 64 bytes for the signature)
     const fileContent = readFileSync(this.filePath);
-    const contentToSign = fileContent.slice(0, fileContent.length - 64);
+    const contentToSign = fileContent;
 
     // Create the signature
     const signature = sign(contentToSign, privateKey);
 
     // Append the signature to the file
     appendFileSync(this.filePath, Buffer.from(signature));
-
-    console.log('File signed successfully.');
   }
 
   verifyFile(publicKeyPath) {
@@ -91,12 +89,6 @@ class BinaryHandler {
 
     // Verify the signature
     const isValid = verify(signature, contentToVerify, publicKey);
-
-    if (isValid) {
-      console.log('File verification successful.');
-    } else {
-      console.error('File verification failed.');
-    }
 
     return isValid;
   }

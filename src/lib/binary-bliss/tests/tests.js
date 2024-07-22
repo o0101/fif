@@ -1,5 +1,5 @@
 import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
-import { unlinkSync, readFileSync, existsSync, writeFileSync } from 'fs';
+import { unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import path from 'path';
 import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
@@ -19,7 +19,7 @@ function saveKeys() {
 
 saveKeys();
 
-function cleanUp(filePath, actuallyDo = false) {
+function cleanUp(filePath, actuallyDo = true) {
   if ( ! actuallyDo ) return;
   if (existsSync(filePath)) {
     unlinkSync(filePath);
@@ -73,11 +73,16 @@ function testColorType() {
   assertEqual(color.blue, readColor.blue.value, 'Color blue');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
 
-  cleanUp(filePath);
+  // because we need color.bin for subserquent tests
+  // cleanUp(filePath, false);
 }
 
 function testMapType() {
@@ -112,11 +117,13 @@ function testMapType() {
   }
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testHeteroArray() {
@@ -136,11 +143,13 @@ function testHeteroArray() {
   assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'HeteroArray date');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testMixedTypeArray() {
@@ -162,11 +171,13 @@ function testMixedTypeArray() {
   assertEqual(array[4].toString(), readArray[4].toString(), 'MixedTypeArray array');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testDateType() {
@@ -184,11 +195,13 @@ function testDateType() {
   assertEqual(date.toISOString(), readDate.toISOString(), 'Date value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testFloatType() {
@@ -206,11 +219,13 @@ function testFloatType() {
   assertEqual(float.toFixed(3), readFloat.toFixed(3), 'Float value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testBufferType() {
@@ -228,11 +243,14 @@ function testBufferType() {
   assertBufferEqual(buffer, handler.$('buffer').value, 'Buffer value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testMagicNumber() {
@@ -250,11 +268,13 @@ function testMagicNumber() {
   assertEqual(magicNumber, handler.last.value, 'Magic number');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testMagicString() {
@@ -272,11 +292,13 @@ function testMagicString() {
   assertEqual(magicString, handler.last.value, 'Magic string');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testMagicBuffer() {
@@ -294,11 +316,13 @@ function testMagicBuffer() {
   assertBufferEqual(magicBuffer, handler.$('magic').value, 'Magic buffer');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testPojoType() {
@@ -328,11 +352,13 @@ function testPojoType() {
   assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO nested array date');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testComplexNonLatinObject() {
@@ -362,11 +388,13 @@ function testComplexNonLatinObject() {
   assertEqual(complexObject.nested.answer, readObject.nested.answer, 'Complex object nested answer');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testMapWithPojo() {
@@ -390,11 +418,13 @@ function testMapWithPojo() {
   assertEqual(mapWithPojo.get('key2').greeting, readMap.get('key2').greeting, 'Map with POJO key2 greeting');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testPojoWithMap() {
@@ -422,11 +452,13 @@ function testPojoWithMap() {
   assertEqual(pojoWithMap.details.get('greeting'), readPojo.details.get('greeting'), 'POJO with Map details greeting');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testSetType() {
@@ -454,11 +486,13 @@ function testSetType() {
   }
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testPojoWithSet() {
@@ -487,11 +521,13 @@ function testPojoWithSet() {
   }
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testSetWithPojo() {
@@ -520,11 +556,13 @@ function testSetWithPojo() {
   }
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testGzipString() {
@@ -543,11 +581,13 @@ function testGzipString() {
   assertEqual(originalString, readString, 'Gzip string value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testGzipBuffer() {
@@ -566,19 +606,22 @@ function testGzipBuffer() {
   assertBufferEqual(originalBuffer, readBuffer, 'Gzip buffer value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function testGzipMixedContent() {
+  const filePath = path.join(process.cwd(), 'gzip_mixed_content.bin');
+
   console.log('Testing Gzip Mixed Content');
 
   const originalString = 'This is a string';
   const originalBuffer = Buffer.from('This is a buffer', 'utf8');
-  const filePath = path.join(process.cwd(), 'gzip_mixed_content.bin');
 
   const handler = new BinaryHandler();
   handler.openFile(filePath);
@@ -594,11 +637,13 @@ function testGzipMixedContent() {
   assertBufferEqual(originalBuffer, readBuffer, 'Gzip mixed content buffer value');
 
   handler.signFile('private.key');
-  handler.verifyFile('public.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
 
   handler.closeFile();
-
-  cleanUp(filePath);
 }
 
 function runGzipTests() {
@@ -607,7 +652,41 @@ function runGzipTests() {
   testGzipMixedContent();
 }
 
+function testFailVerify() {
+  const filePath = path.join(process.cwd(), 'fail_verify.bin');
+
+  console.log('Testing Fail Verify');
+
+  // Step 1: Generate a random numeric array binary file
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+
+  const randomArray = Array.from({ length: 100 }, () => Math.floor(Math.random() * 256));
+  handler.array(randomArray, randomArray.length, 'uint8');
+
+  // Step 2: Sign the file
+  handler.signFile('private.key');
+
+  // Step 3: Modify a part of the file
+  const fileContent = readFileSync(filePath);
+  fileContent[10] = fileContent[10] ^ 0xFF; // Modify the 11th byte to introduce an error
+  writeFileSync(filePath, fileContent);
+
+  // Step 4: Try to verify the file, expecting it to fail
+  const isValid = handler.verifyFile('public.key');
+
+  if (!isValid) {
+    console.log(`${greenCheck} Test passed: File verification after modification failed as expected.`);
+  } else {
+    console.error(`${redCross} Test failed: File verification succeeded unexpectedly.`);
+  }
+
+  handler.closeFile();
+}
+
 function runTests() {
+  readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
+
   testColorType();
   testBufferType();
   testMagicNumber();
@@ -626,6 +705,7 @@ function runTests() {
   testSetWithPojo();
   testPojoWithSet();
   runGzipTests();
+  testFailVerify();
 
   cleanUp('private.key', true);
   cleanUp('public.key', true);
