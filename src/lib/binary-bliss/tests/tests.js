@@ -105,11 +105,87 @@ function testColorType() {
   }
 
   handler.closeFile();
-
-  // because we need color.bin for subserquent tests
-  // cleanUp(filePath, false);
 }
 
+function testBitFields() {
+  console.log('Testing Bit Fields');
+
+  const filePath = path.join('bit_fields.bin');
+  const bh = new BinaryHandler();
+  bh.openFile(filePath);
+
+  // Writing bit fields
+  bh.bit(1, 1); // Write a single bit with value 1
+  bh.bit(3, 5); // Write three bits with value 5 (101 in binary)
+  bh.bit(4, 9); // Write four bits with value 9 (1001 in binary)
+  bh.bit(8, 255); // Write eight bits with value 255 (11111111 in binary)
+
+  // Reset buffer for reading
+  bh.cursor = 0;
+  bh.bitCursor = 0;
+  //bh.reading = [];
+
+  // Reading bit fields
+  bh.bit(1, 'bit1');
+  bh.bit(3, 'bit3');
+  bh.bit(4, 'bit4');
+  bh.bit(8, 'bit8');
+
+  const result = bh.read();
+  console.log(result);
+  assertEqual(result.bit1.value, 1, 'Bit1 value');
+  assertEqual(result.bit3.value, 5, 'Bit3 value');
+  assertEqual(result.bit4.value, 9, 'Bit4 value');
+  assertEqual(result.bit8.value, 255, 'Bit8 value');
+
+  // Sign and verify the file
+  bh.signFile('private.key');
+  if (!bh.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  bh.closeFile();
+}
+
+function testBitFieldCrossByteBoundary() {
+  console.log('Testing Bit Fields Across Byte Boundaries');
+
+  const filePath = path.join('bit_fields_cross_byte.bin');
+  const bh = new BinaryHandler();
+  bh.openFile(filePath);
+
+  // Writing bit fields
+  bh.bit(4, 15);  // Write four bits with value 15 (1111 in binary)
+  bh.bit(8, 170); // Write eight bits with value 170 (10101010 in binary)
+  bh.bit(12, 4095); // Write twelve bits with value 4095 (111111111111 in binary)
+
+  // Reset buffer for reading
+  bh.cursor = 0;
+  bh.bitCursor = 0;
+  //bh.reading = [];
+
+  // Reading bit fields
+  bh.bit(4, 'bit4');
+  bh.bit(8, 'bit8');
+  bh.bit(12, 'bit12');
+
+  const result = bh.read();
+  assertEqual(result.bit4.value, 15, 'Bit4 value');
+  assertEqual(result.bit8.value, 170, 'Bit8 value');
+  assertEqual(result.bit12.value, 4095, 'Bit12 value');
+
+  // Sign and verify the file
+  bh.signFile('private.key');
+  if (!bh.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  bh.closeFile();
+}
 function testMapType() {
   console.log('Testing Map Type');
 
@@ -200,7 +276,6 @@ function testNestedArray() {
   }
 
   handler.closeFile();
-  cleanUp(filePath);
 }
 
 function testMixedTypeArray() {
@@ -739,6 +814,8 @@ function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
   testColorType();
+  testBitFields();
+  testBitFieldCrossByteBoundary();
   testBufferType();
   testMagicNumber();
   testMagicString();
