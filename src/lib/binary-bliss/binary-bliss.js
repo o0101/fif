@@ -1,7 +1,8 @@
-import { openSync, readSync, writeSync, closeSync, fstatSync, statSync, existsSync } from 'fs';
+import { openSync, readSync, writeSync, closeSync, fstatSync, statSync, existsSync, readFileSync, appendFileSync } from 'fs';
 import { Buffer } from 'buffer';
 import path from 'path';
 import zlib from 'zlib';
+import { sign, verify } from '@noble/ed25519';
 
 const ATextEncoder = new TextEncoder;
 const ATextDecoder = new TextDecoder;
@@ -44,6 +45,7 @@ class BinaryHandler {
       const isWritable = (stats.mode & 0o200) !== 0;
       this.fd = openSync(safePath, isWritable ? 'r+' : 'r');
     }
+    this.filePath = filePath;
     return this;
   }
 
@@ -53,6 +55,50 @@ class BinaryHandler {
       this.fd = null;
     }
     return this;
+  }
+
+  signFile(privateKeyPath) {
+    // Read the private key
+    if ( ! existsSync(privateKeyPath) || ! existsSync(this.filePath) ) {
+      throw new Error(`Both private key (${privateKeyPath}) and file (${this.filePath}) must exist.`);
+    }
+    const privateKey = Buffer.from(readFileSync(privateKeyPath, 'utf8'), 'hex');
+
+    // Read the file content excluding the signature (assume last 64 bytes for the signature)
+    const fileContent = readFileSync(this.filePath);
+    const contentToSign = fileContent.slice(0, fileContent.length - 64);
+
+    // Create the signature
+    const signature = sign(contentToSign, privateKey);
+
+    // Append the signature to the file
+    appendFileSync(this.filePath, Buffer.from(signature));
+
+    console.log('File signed successfully.');
+  }
+
+  verifyFile(publicKeyPath) {
+    // Read the public key
+    if ( ! existsSync(publicKeyPath) || ! existsSync(this.filePath) ) {
+      throw new Error(`Both public key (${publicKeyPath}) and file (${this.filePath}) must exist.`);
+    }
+    const publicKey = Buffer.from(readFileSync(publicKeyPath, 'utf8'), 'hex');
+
+    // Read the file content excluding the signature (assume last 64 bytes for the signature)
+    const fileContent = readFileSync(this.filePath);
+    const contentToVerify = fileContent.slice(0, fileContent.length - 64);
+    const signature = fileContent.slice(fileContent.length - 64);
+
+    // Verify the signature
+    const isValid = verify(signature, contentToVerify, publicKey);
+
+    if (isValid) {
+      console.log('File verification successful.');
+    } else {
+      console.error('File verification failed.');
+    }
+
+    return isValid;
   }
 
   _seek(offset) {

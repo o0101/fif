@@ -1,9 +1,23 @@
 import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
-import { unlinkSync, readFileSync, existsSync } from 'fs';
+import { unlinkSync, readFileSync, existsSync, writeFileSync } from 'fs';
 import path from 'path';
+import * as eddsa from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha512';
+eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
+
 
 const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
+
+const privateKey = eddsa.utils.randomPrivateKey();
+const publicKey = eddsa.getPublicKey(privateKey);
+
+function saveKeys() {
+  writeFileSync('private.key', Buffer.from(privateKey).toString('hex'), 'utf8');
+  writeFileSync('public.key', Buffer.from(publicKey).toString('hex'), 'utf8');
+}
+
+saveKeys();
 
 function cleanUp(filePath) {
   return;
@@ -53,11 +67,15 @@ function testColorType() {
   BinaryTypes.write(handler, 'Color', color);
   handler.jump(0);
   const readColor = BinaryTypes.read(handler, 'Color');
-  handler.closeFile();
 
   assertEqual(color.red, readColor.red.value, 'Color red');
   assertEqual(color.green, readColor.green.value, 'Color green');
   assertEqual(color.blue, readColor.blue.value, 'Color blue');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -87,12 +105,16 @@ function testMapType() {
   handler.jump(0);
   handler.readMagic('MAP');
   const readMap = handler.map('map').last.value;
-  handler.closeFile();
 
   assertEqual(map.size, readMap.size, 'Map size');
   for (const [key, value] of map.entries()) {
     assertEqual(value, readMap.get(key), `Map entry ${key}`);
   }
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -108,11 +130,15 @@ function testHeteroArray() {
   handler.heteroArray(array);
   handler.jump(0);
   const readArray = handler.heteroArray('array').last.value;
-  handler.closeFile();
 
   assertEqual(array[0], readArray[0], 'HeteroArray string');
   assertEqual(array[1], readArray[1], 'HeteroArray number');
   assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'HeteroArray date');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -128,13 +154,17 @@ function testMixedTypeArray() {
   handler.heteroArray(array);
   handler.jump(0);
   const readArray = handler.heteroArray('array').last.value;
-  handler.closeFile();
 
   assertEqual(array[0], readArray[0], 'MixedTypeArray string');
   assertEqual(array[1], readArray[1], 'MixedTypeArray number');
   assertEqual(array[2].toISOString(), readArray[2].toISOString(), 'MixedTypeArray date');
   assertEqual(array[3].foo, readArray[3].foo, 'MixedTypeArray object');
   assertEqual(array[4].toString(), readArray[4].toString(), 'MixedTypeArray array');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -150,9 +180,13 @@ function testDateType() {
   handler.date(date);
   handler.jump(0);
   const readDate = handler.date('date').last.value;
-  handler.closeFile();
 
   assertEqual(date.toISOString(), readDate.toISOString(), 'Date value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -168,9 +202,13 @@ function testFloatType() {
   handler.float(float);
   handler.jump(0);
   const readFloat = handler.float('float').last.value;
-  handler.closeFile();
 
   assertEqual(float.toFixed(3), readFloat.toFixed(3), 'Float value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -186,9 +224,13 @@ function testBufferType() {
   handler.buffer(buffer);  // Writing buffer
   handler.jump(0);
   handler.buffer('buffer', buffer.length); // Reading buffer with specified length
-  handler.closeFile();
 
   assertBufferEqual(buffer, handler.$('buffer').value, 'Buffer value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -204,9 +246,13 @@ function testMagicNumber() {
   handler.writeMagic(magicNumber);   // Writing magic number
   handler.jump(0);
   handler.readMagic(magicNumber);    // Reading magic number
-  handler.closeFile();
 
   assertEqual(magicNumber, handler.last.value, 'Magic number');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -222,9 +268,13 @@ function testMagicString() {
   handler.writeMagic(magicString);   // Writing magic string
   handler.jump(0);
   handler.readMagic(magicString);    // Reading magic string
-  handler.closeFile();
 
   assertEqual(magicString, handler.last.value, 'Magic string');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -240,9 +290,13 @@ function testMagicBuffer() {
   handler.writeMagic(magicBuffer);   // Writing magic buffer
   handler.jump(0);
   handler.readMagic(magicBuffer);    // Reading magic buffer
-  handler.closeFile();
 
   assertBufferEqual(magicBuffer, handler.$('magic').value, 'Magic buffer');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -265,7 +319,6 @@ function testPojoType() {
   handler.pojo(pojo);
   handler.jump(0);
   const readPojo = handler.pojo('pojo').last.value;
-  handler.closeFile();
 
   assertEqual(pojo.name, readPojo.name, 'POJO name');
   assertEqual(pojo.age, readPojo.age, 'POJO age');
@@ -274,6 +327,11 @@ function testPojoType() {
   assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'POJO nested array string');
   assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO nested array date');
 
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
+
   cleanUp(filePath);
 }
 
@@ -281,12 +339,12 @@ function testComplexNonLatinObject() {
   console.log('Testing Complex Object with Non-Latin Characters');
 
   const complexObject = {
-    greeting: "你好",
-    farewell: "مع السلامة",
-    mixed: "Hello, 你好, مرحبا!",
+    greeting: "‰Ω†Â•Ω",
+    farewell: "ŸÖÿπ ÿßŸÑÿ≥ŸÑÿßŸÖÿ©",
+    mixed: "Hello, ‰Ω†Â•Ω, ŸÖÿ±ÿ≠ÿ®ÿß!",
     nested: {
-      question: "你好吗？",
-      answer: "الحمد لله"
+      question: "‰Ω†Â•ΩÂêóÔºü",
+      answer: "ÿßŸÑÿ≠ŸÖÿØ ŸÑŸÑŸá"
     }
   };
   const filePath = path.join(process.cwd(), 'complex_non_latin_object.bin');
@@ -296,13 +354,17 @@ function testComplexNonLatinObject() {
   handler.pojo(complexObject);
   handler.jump(0);
   const readObject = handler.pojo('complexObject').last.value;
-  handler.closeFile();
 
   assertEqual(complexObject.greeting, readObject.greeting, 'Complex object greeting');
   assertEqual(complexObject.farewell, readObject.farewell, 'Complex object farewell');
   assertEqual(complexObject.mixed, readObject.mixed, 'Complex object mixed');
   assertEqual(complexObject.nested.question, readObject.nested.question, 'Complex object nested question');
   assertEqual(complexObject.nested.answer, readObject.nested.answer, 'Complex object nested answer');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -312,7 +374,7 @@ function testMapWithPojo() {
 
   const mapWithPojo = new Map();
   mapWithPojo.set('key1', 'value1');
-  mapWithPojo.set('key2', { name: 'Test', greeting: "你好" });
+  mapWithPojo.set('key2', { name: 'Test', greeting: "‰Ω†Â•Ω" });
 
   const filePath = path.join(process.cwd(), 'map_with_pojo.bin');
 
@@ -321,12 +383,16 @@ function testMapWithPojo() {
   handler.map(mapWithPojo);
   handler.jump(0);
   const readMap = handler.map('mapWithPojo').last.value;
-  handler.closeFile();
 
   assertEqual(mapWithPojo.size, readMap.size, 'Map with POJO size');
   assertEqual(mapWithPojo.get('key1'), readMap.get('key1'), 'Map with POJO key1 value');
   assertEqual(mapWithPojo.get('key2').name, readMap.get('key2').name, 'Map with POJO key2 name');
   assertEqual(mapWithPojo.get('key2').greeting, readMap.get('key2').greeting, 'Map with POJO key2 greeting');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -338,7 +404,7 @@ function testPojoWithMap() {
     name: 'Test POJO',
     details: new Map([
       ['language', 'JavaScript'],
-      ['greeting', '你好']
+      ['greeting', '‰Ω†Â•Ω']
     ])
   };
 
@@ -349,12 +415,16 @@ function testPojoWithMap() {
   handler.pojo(pojoWithMap);
   handler.jump(0);
   const readPojo = handler.pojo('pojoWithMap').last.value;
-  handler.closeFile();
 
   assertEqual(pojoWithMap.name, readPojo.name, 'POJO with Map name');
   assertEqual(pojoWithMap.details.size, readPojo.details.size, 'POJO with Map details size');
   assertEqual(pojoWithMap.details.get('language'), readPojo.details.get('language'), 'POJO with Map details language');
   assertEqual(pojoWithMap.details.get('greeting'), readPojo.details.get('greeting'), 'POJO with Map details greeting');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -370,7 +440,6 @@ function testSetType() {
   handler.set(set);
   handler.jump(0);
   const readSet = handler.set('set').last.value;
-  handler.closeFile();
 
   const setArray = Array.from(set);
   const readSetArray = Array.from(readSet);
@@ -384,6 +453,11 @@ function testSetType() {
     }
   }
 
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
+
   cleanUp(filePath);
 }
 
@@ -392,7 +466,7 @@ function testPojoWithSet() {
 
   const pojoWithSet = {
     name: 'Test POJO',
-    details: new Set(['JavaScript', '你好'])
+    details: new Set(['JavaScript', '‰Ω†Â•Ω'])
   };
 
   const filePath = path.join(process.cwd(), 'pojo_with_set.bin');
@@ -402,7 +476,6 @@ function testPojoWithSet() {
   handler.pojo(pojoWithSet);
   handler.jump(0);
   const readPojo = handler.pojo('pojoWithSet').last.value;
-  handler.closeFile();
 
   assertEqual(pojoWithSet.name, readPojo.name, 'POJO with Set name');
   assertEqual(pojoWithSet.details.size, readPojo.details.size, 'POJO with Set details size');
@@ -413,6 +486,11 @@ function testPojoWithSet() {
     assertEqual(detailsArray[i], readDetailsArray[i], `POJO with Set details element ${i}`);
   }
 
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
+
   cleanUp(filePath);
 }
 
@@ -420,8 +498,8 @@ function testSetWithPojo() {
   console.log('Testing Set with POJO Value');
 
   const setWithPojo = new Set([
-    { language: 'JavaScript', greeting: '你好' },
-    { language: 'Python', greeting: 'مرحبا' }
+    { language: 'JavaScript', greeting: '‰Ω†Â•Ω' },
+    { language: 'Python', greeting: 'ŸÖÿ±ÿ≠ÿ®ÿß' }
   ]);
 
   const filePath = path.join(process.cwd(), 'set_with_pojo.bin');
@@ -431,7 +509,6 @@ function testSetWithPojo() {
   handler.set(setWithPojo);
   handler.jump(0);
   const readSet = handler.set('setWithPojo').last.value;
-  handler.closeFile();
 
   const setArray = Array.from(setWithPojo);
   const readSetArray = Array.from(readSet);
@@ -441,6 +518,11 @@ function testSetWithPojo() {
     assertEqual(setArray[i].language, readSetArray[i].language, `Set with POJO element ${i} language`);
     assertEqual(setArray[i].greeting, readSetArray[i].greeting, `Set with POJO element ${i} greeting`);
   }
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -456,10 +538,14 @@ function testGzipString() {
   handler.gzip({ data: originalString }); // Writing gzipped string
   handler.jump(0);
   handler.gzip('gzipString'); // Reading gzipped string
-  handler.closeFile();
 
   const readString = handler.$('gzipString').value;
   assertEqual(originalString, readString, 'Gzip string value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -475,10 +561,14 @@ function testGzipBuffer() {
   handler.gzip({ data: originalBuffer }); // Writing gzipped buffer
   handler.jump(0);
   handler.gzip('gzipBuffer'); // Reading gzipped buffer
-  handler.closeFile();
 
   const readBuffer = handler.$('gzipBuffer').value;
   assertBufferEqual(originalBuffer, readBuffer, 'Gzip buffer value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -497,12 +587,16 @@ function testGzipMixedContent() {
   handler.jump(0);
   handler.gzip('gzipString'); // Reading gzipped string
   handler.gzip('gzipBuffer'); // Reading gzipped buffer
-  handler.closeFile();
 
   const readString = handler.$('gzipString').value;
   const readBuffer = handler.$('gzipBuffer').value;
   assertEqual(originalString, readString, 'Gzip mixed content string value');
   assertBufferEqual(originalBuffer, readBuffer, 'Gzip mixed content buffer value');
+
+  handler.signFile('private.key');
+  handler.verifyFile('public.key');
+
+  handler.closeFile();
 
   cleanUp(filePath);
 }
@@ -512,7 +606,6 @@ function runGzipTests() {
   testGzipBuffer();
   testGzipMixedContent();
 }
-
 
 function runTests() {
   testColorType();
@@ -533,7 +626,6 @@ function runTests() {
   testSetWithPojo();
   testPojoWithSet();
   runGzipTests();
-
 }
 
 runTests();
