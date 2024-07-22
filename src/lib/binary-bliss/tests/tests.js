@@ -1,6 +1,6 @@
-import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
-import { unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import path from 'path';
+import { unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
+import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
 import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
@@ -19,28 +19,53 @@ function saveKeys() {
 
 saveKeys();
 
-function cleanUp(filePath, actuallyDo = true) {
-  if ( ! actuallyDo ) return;
-  if (existsSync(filePath)) {
-    unlinkSync(filePath);
+// helpers
+  function cleanUp(filePath, actuallyDo = true) {
+    if ( ! actuallyDo ) return;
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
+    }
   }
-}
 
-function assertEqual(expected, actual, message) {
-  if (expected !== actual) {
-    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
-  } else {
-    console.log(`${greenCheck} Test passed: ${message}`);
+  function assertEqual(expected, actual, message) {
+    if (expected != actual) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+    } else {
+      console.log(`${greenCheck} Test passed: ${message}`);
+    }
   }
-}
+ 
+  function assertNestedArrayEqual(expected, actual, message) {
+    if (!Array.isArray(expected) || !Array.isArray(actual)) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+      return;
+    }
 
-function assertBufferEqual(expected, actual, message) {
-  if (Buffer.compare(expected, actual) !== 0) {
-    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
-  } else {
-    console.log(`${greenCheck} Test passed: ${message}`);
+    if (expected.length !== actual.length) {
+      console.error(`${redCross} Test failed: ${message}\nExpected length: ${expected.length}\nActual length: ${actual.length}`);
+      return;
+    }
+
+    for (let i = 0; i < expected.length; i++) {
+      if (Array.isArray(expected[i]) && Array.isArray(actual[i])) {
+        assertNestedArrayEqual(expected[i], actual[i], `${message} (index ${i})`);
+      } else if (expected[i] instanceof Date && actual[i] instanceof Date) {
+        assertEqual(expected[i].toISOString(), actual[i].toISOString(), `${message} (index ${i})`);
+      } else if (typeof expected[i] === 'object' && typeof actual[i] === 'object') {
+        assertEqual(JSON.stringify(expected[i]), JSON.stringify(actual[i]), `${message} (index ${i})`);
+      } else {
+        assertEqual(expected[i], actual[i], `${message} (index ${i})`);
+      }
+    }
   }
-}
+
+  function assertBufferEqual(expected, actual, message) {
+    if (Buffer.compare(expected, actual) !== 0) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
+    } else {
+      console.log(`${greenCheck} Test passed: ${message}`);
+    }
+  }
 
 function testColorType() {
   console.log('Testing Color Type');
@@ -150,6 +175,32 @@ function testHeteroArray() {
   }
 
   handler.closeFile();
+}
+
+function testNestedArray() {
+  console.log('Testing Nested Array');
+
+  const nestedArray = [[1, 2, 3], [4, 5, 6, [7, 8, 9]], 10, 'Hello', new Date()];
+  const filePath = path.join(process.cwd(), 'nestedArray.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.heteroArray(nestedArray);
+  handler.jump(0);
+  const readNestedArray = handler.heteroArray('nestedArray').last.value;
+
+  assertNestedArrayEqual(nestedArray, readNestedArray, 'Nested Array');
+
+  handler.signFile('private.key');
+  const isValid = handler.verifyFile('public.key');
+  if (isValid) {
+    console.log(`${greenCheck} File verification successful.`);
+  } else {
+    console.error(`${redCross} File verification failed.`);
+  }
+
+  handler.closeFile();
+  cleanUp(filePath);
 }
 
 function testMixedTypeArray() {
@@ -694,6 +745,7 @@ function runTests() {
   testMagicBuffer();
   testMapType();
   testHeteroArray();
+  testNestedArray();
   testDateType();
   testFloatType();
   testPojoType();
