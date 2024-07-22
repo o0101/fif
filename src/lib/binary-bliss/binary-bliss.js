@@ -268,10 +268,13 @@ class BinaryHandler {
 
   bit(length, keyOrValue) {
     this._validateLength(length);
+
     if (typeof keyOrValue === 'string') {
-      this._ensureBytes(Math.ceil(length / 8));
       let value = 0;
       for (let i = 0; i < length; i++) {
+        if (this.bitCursor === 0) {
+          this._ensureBytes(1);
+        }
         const bit = (this._buffer[this.cursor] >> (7 - this.bitCursor)) & 1;
         value = (value << 1) | bit;
         this.bitCursor = (this.bitCursor + 1) % 8;
@@ -284,15 +287,16 @@ class BinaryHandler {
     } else {
       const value = keyOrValue;
       for (let i = 0; i < length; i++) {
-        const bit = (value >> (length - 1 - i)) & 1;
         if (this.bitCursor === 0) {
           this._buffer = Buffer.concat([this._buffer, Buffer.alloc(1)]);
-          this.cursor += 1;
         }
+        const bit = (value >> (length - 1 - i)) & 1;
         this._buffer[this.cursor] |= bit << (7 - this.bitCursor);
         this.bitCursor = (this.bitCursor + 1) % 8;
+        if (this.bitCursor === 0) {
+          this.cursor++;
+        }
       }
-      this._writeBytes(this._buffer.slice(-Math.ceil(length / 8)));
       return this;
     }
   }
