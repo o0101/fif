@@ -19,8 +19,8 @@ function saveKeys() {
 
 saveKeys();
 
-function cleanUp(filePath) {
-  return;
+function cleanUp(filePath, actuallyDo = false) {
+  if ( ! actuallyDo ) return;
   if (existsSync(filePath)) {
     unlinkSync(filePath);
   }
@@ -626,6 +626,9 @@ function runTests() {
   testSetWithPojo();
   testPojoWithSet();
   runGzipTests();
+
+  cleanUp('private.key', true);
+  cleanUp('public.key', true);
 }
 
 runTests();
