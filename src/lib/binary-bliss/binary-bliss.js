@@ -579,6 +579,9 @@ class BinaryHandler {
     } else if (value instanceof Set) {
       this.uint8(BinaryType.SET); // Type flag for set
       this.set(value);
+    } else if (typeof value === 'object' && value !== null) {
+      this.uint8(BinaryType.POJO);
+      this.pojo(value);
     } else if (Buffer.isBuffer(value)) {
       this.uint8(BinaryType.BUFFER); // Type flag for buffer
       this.buffer(value);

@@ -445,6 +445,75 @@ function testSetWithPojo() {
   cleanUp(filePath);
 }
 
+function testGzipString() {
+  console.log('Testing Gzip String');
+
+  const originalString = 'Hello, this is a test string for gzip compression!';
+  const filePath = path.join(process.cwd(), 'gzip_string.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.gzip({ data: originalString }); // Writing gzipped string
+  handler.jump(0);
+  handler.gzip('gzipString'); // Reading gzipped string
+  handler.closeFile();
+
+  const readString = handler.$('gzipString').value;
+  assertEqual(originalString, readString, 'Gzip string value');
+
+  cleanUp(filePath);
+}
+
+function testGzipBuffer() {
+  console.log('Testing Gzip Buffer');
+
+  const originalBuffer = Buffer.from('Hello, this is a test buffer for gzip compression!', 'utf8');
+  const filePath = path.join(process.cwd(), 'gzip_buffer.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.gzip({ data: originalBuffer }); // Writing gzipped buffer
+  handler.jump(0);
+  handler.gzip('gzipBuffer'); // Reading gzipped buffer
+  handler.closeFile();
+
+  const readBuffer = handler.$('gzipBuffer').value;
+  assertBufferEqual(originalBuffer, readBuffer, 'Gzip buffer value');
+
+  cleanUp(filePath);
+}
+
+function testGzipMixedContent() {
+  console.log('Testing Gzip Mixed Content');
+
+  const originalString = 'This is a string';
+  const originalBuffer = Buffer.from('This is a buffer', 'utf8');
+  const filePath = path.join(process.cwd(), 'gzip_mixed_content.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.gzip({ data: originalString }); // Writing gzipped string
+  handler.gzip({ data: originalBuffer }); // Writing gzipped buffer
+  handler.jump(0);
+  handler.gzip('gzipString'); // Reading gzipped string
+  handler.gzip('gzipBuffer'); // Reading gzipped buffer
+  handler.closeFile();
+
+  const readString = handler.$('gzipString').value;
+  const readBuffer = handler.$('gzipBuffer').value;
+  assertEqual(originalString, readString, 'Gzip mixed content string value');
+  assertBufferEqual(originalBuffer, readBuffer, 'Gzip mixed content buffer value');
+
+  cleanUp(filePath);
+}
+
+function runGzipTests() {
+  testGzipString();
+  testGzipBuffer();
+  testGzipMixedContent();
+}
+
+
 function runTests() {
   testColorType();
   testBufferType();
@@ -463,6 +532,8 @@ function runTests() {
   testSetType();
   testSetWithPojo();
   testPojoWithSet();
+  runGzipTests();
+
 }
 
 runTests();
