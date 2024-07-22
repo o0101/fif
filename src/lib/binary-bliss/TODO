@@ -1,0 +1,3 @@
+- add a gzip stream
+- add an optional digital signature field for files that are read-only or can be re-signed before distribution as read-only
+
