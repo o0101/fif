@@ -1,12 +1,24 @@
 import { openSync, readSync, writeSync, closeSync, fstatSync, statSync, existsSync } from 'fs';
 import { Buffer } from 'buffer';
 import path from 'path';
+import zlib from 'zlib';
 
 const ATextEncoder = new TextEncoder;
 const ATextDecoder = new TextDecoder;
 const ETEXT = true;
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
+
+const BinaryType = {
+  STRING: 1,
+  FLOAT: 2,
+  DATE: 3,
+  HETERO_ARRAY: 4,
+  POJO: 5,
+  MAP: 6,
+  SET: 7,
+  BUFFER: 8,
+};
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -98,6 +110,122 @@ class BinaryHandler {
       console.error('Error writing bytes:', error);
       throw error;
     }
+  }
+
+  compressData(data) {
+    return zlib.gzipSync(data);
+  }
+
+  decompressData(data) {
+    return zlib.gunzipSync(data);
+  }
+
+  gzip(options) {
+    if (typeof options === 'string') {
+      // Reading and decompressing
+      const key = options;
+      this._ensureBytes(1); // Read type
+      const type = this._readBytes(1).readUInt8(0);
+      this._ensureBytes(4); // Read length
+      const compressedLength = this._readBytes(4).readUInt32BE(0);
+      this._validateLength(compressedLength); // Validate the length
+      this._ensureBytes(compressedLength);
+      let compressedData = this._readBytes(compressedLength);
+      compressedData = this.decompressData(compressedData);
+      let value;
+      if (type === BinaryType.STRING) {
+        value = ATextDecoder.decode(compressedData);
+      } else if (type === BinaryType.BUFFER) {
+        value = compressedData;
+      } else {
+        throw new Error('Unknown data type');
+      }
+      this.reading.push({ key, value, type: 'gzip' });
+    } else {
+      // Writing and compressing
+      const { data } = options;
+      let encodedData, type;
+      if (typeof data === 'string') {
+        encodedData = Buffer.from(ATextEncoder.encode(data));
+        type = BinaryType.STRING; // Type flag for string
+      } else if (Buffer.isBuffer(data)) {
+        encodedData = data;
+        type = BinaryType.BUFFER; // Type flag for buffer
+      } else {
+        throw new Error('Invalid data type for gzip method');
+      }
+      const compressedData = this.compressData(encodedData);
+      const typeBuffer = Buffer.alloc(1);
+      typeBuffer.writeUInt8(type, 0);
+      const lengthBuffer = Buffer.alloc(4);
+      lengthBuffer.writeUInt32BE(compressedData.length, 0);
+      this._writeBytes(Buffer.concat([typeBuffer, lengthBuffer, compressedData]));
+    }
+    return this;
+  }
+
+  _writeTypeAndValue(value) {
+    if (typeof value === 'string') {
+      this.uint8(BinaryType.STRING); // Type flag for string
+      this.puts(value);
+    } else if (typeof value === 'number') {
+      this.uint8(BinaryType.FLOAT); // Type flag for float (use 2 for consistency)
+      this.float(value);
+    } else if (value instanceof Date) {
+      this.uint8(BinaryType.DATE); // Type flag for date
+      this.date(value);
+    } else if (Array.isArray(value)) {
+      this.uint8(BinaryType.HETERO_ARRAY); // Type flag for heteroArray
+      this.heteroArray(value);
+    } else if (value instanceof Map) {
+      this.uint8(BinaryType.MAP); // Type flag for map
+      this.map(value);
+    } else if (value instanceof Set) {
+      this.uint8(BinaryType.SET); // Type flag for set
+      this.set(value);
+    } else if (Buffer.isBuffer(value)) {
+      this.uint8(BinaryType.BUFFER); // Type flag for buffer
+      this.buffer(value);
+    } else {
+      throw new Error('Unsupported type for _writeTypeAndValue');
+    }
+  }
+
+  _readTypeAndValue(uniq = 'value') {
+    const type = this.uint8('type').last.value;
+    let value;
+    switch (type) {
+      case BinaryType.STRING:
+        value = this.gets(uniq).last.value;
+        break;
+      case BinaryType.FLOAT:
+        value = this.float(uniq).last.value;
+        break;
+      case BinaryType.DATE:
+        value = this.date(uniq).last.value;
+        break;
+      case BinaryType.HETERO_ARRAY:
+        value = this.heteroArray(uniq).last.value;
+        break;
+      case BinaryType.POJO:
+        this.pojo(uniq);
+        value = this.$(uniq).value;
+        break;
+      case BinaryType.MAP:
+        this.map(uniq);
+        value = this.$(uniq).value;
+        break;
+      case BinaryType.SET:
+        this.set(uniq);
+        value = this.$(uniq).value;
+        break;
+      case BinaryType.BUFFER:
+        value = this.buffer(uniq).last.value;
+        break;
+      default:
+        throw new Error('Unknown type in _readTypeAndValue');
+    }
+    return value;
   }
 
   bit(length, keyOrValue) {
@@ -434,59 +562,65 @@ class BinaryHandler {
 
   _writeTypeAndValue(value) {
     if (typeof value === 'string') {
-      this.uint8(1);
+      this.uint8(BinaryType.STRING); // Type flag for string
       this.puts(value);
     } else if (typeof value === 'number') {
-      this.uint8(2);
+      this.uint8(BinaryType.FLOAT); // Type flag for float
       this.float(value);
     } else if (value instanceof Date) {
-      this.uint8(3);
+      this.uint8(BinaryType.DATE); // Type flag for date
       this.date(value);
     } else if (Array.isArray(value)) {
-      this.uint8(4);
+      this.uint8(BinaryType.HETERO_ARRAY); // Type flag for heteroArray
       this.heteroArray(value);
     } else if (value instanceof Map) {
-      this.uint8(6);
+      this.uint8(BinaryType.MAP); // Type flag for map
       this.map(value);
     } else if (value instanceof Set) {
-      this.uint8(7);
+      this.uint8(BinaryType.SET); // Type flag for set
       this.set(value);
-    } else if (typeof value === 'object' && value !== null) {
-      this.uint8(5);
-      this.pojo(value);
+    } else if (Buffer.isBuffer(value)) {
+      this.uint8(BinaryType.BUFFER); // Type flag for buffer
+      this.buffer(value);
+    } else {
+      console.error(`Unsupported value`, value);
+      throw new Error('Unsupported type for _writeTypeAndValue');
     }
-    // Handle other types similarly
   }
 
   _readTypeAndValue(uniq = 'value') {
     const type = this.uint8('type').last.value;
     let value;
     switch (type) {
-      case 1:
+      case BinaryType.STRING:
         value = this.gets(uniq).last.value;
         break;
-      case 2:
+      case BinaryType.FLOAT:
         value = this.float(uniq).last.value;
         break;
-      case 3:
+      case BinaryType.DATE:
         value = this.date(uniq).last.value;
         break;
-      case 4:
+      case BinaryType.HETERO_ARRAY:
         value = this.heteroArray(uniq).last.value;
         break;
-      case 5:
+      case BinaryType.POJO:
         this.pojo(uniq);
         value = this.$(uniq).value;
         break;
-      case 6:
+      case BinaryType.MAP:
         this.map(uniq);
         value = this.$(uniq).value;
         break;
-      case 7:
+      case BinaryType.SET:
         this.set(uniq);
         value = this.$(uniq).value;
         break;
-      // Handle other types similarly
+      case BinaryType.BUFFER:
+        value = this.buffer(uniq).last.value;
+        break;
+      default:
+        throw new Error('Unknown type in _readTypeAndValue');
     }
     return value;
   }
@@ -765,5 +899,5 @@ const BinaryUtils = {
   */
 };
 
-export { BinaryHandler, BinaryTypes, BinaryUtils };
+export { BinaryHandler, BinaryTypes, BinaryUtils, BinaryType };
 
