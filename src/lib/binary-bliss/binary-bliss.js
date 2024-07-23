@@ -21,50 +21,57 @@ const BinaryType = {
   BUFFER: 8,
 };
 
-// Function to write bits into a buffer
-function writeBits(length, value) {
+
+function readBits(length, buffer, bitOffset = 0) {
   if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
     throw new Error('Length must be a positive integer');
   }
 
-  value = BigInt(value);
-
-  const byteLength = Math.ceil(length / 8);
-  const buffer = Buffer.alloc(byteLength);
-
-  for (let i = 0; i < length; i++) {
-    const bit = (value >> BigInt(length - 1 - i)) & 1n;
-    const byteIndex = Math.floor(i / 8);
-    const bitIndex = 7 - (i % 8);
-    buffer[byteIndex] |= Number(bit) << bitIndex;
-  }
-
-  return buffer;
-}
-
-// Function to read bits from a buffer
-function readBits(length, buffer) {
-  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
-    throw new Error('Length must be a positive integer');
-  }
-
-  const byteLength = Math.ceil(length / 8);
+  const byteLength = Math.ceil((bitOffset + length) / 8);
   if (!Buffer.isBuffer(buffer) || buffer.length < byteLength) {
-    console.error({length, buffer});
     throw new Error('Buffer is too small for the specified length');
   }
 
   let value = 0n;
 
   for (let i = 0; i < length; i++) {
-    const byteIndex = Math.floor(i / 8);
-    const bitIndex = 7 - (i % 8);
+    const totalBitIndex = bitOffset + i;
+    const byteIndex = Math.floor(totalBitIndex / 8);
+    const bitIndex = 7 - (totalBitIndex % 8);
     const bit = (buffer[byteIndex] >> bitIndex) & 1;
     value = (value << 1n) | BigInt(bit);
   }
 
   return value;
 }
+
+// Function to write bits into a buffer
+function writeBits(length, value, buffer, bitOffset = 0) {
+  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+    throw new Error('Length must be a positive integer');
+  }
+
+  value = BigInt(value);
+
+  const byteLength = Math.ceil((bitOffset + length) / 8);
+  const newBuffer = Buffer.alloc(byteLength);
+
+  for (let i = 0; i < length; i++) {
+    const bit = (value >> BigInt(length - 1 - i)) & 1n;
+    const totalBitIndex = bitOffset + i;
+    const byteIndex = Math.floor(totalBitIndex / 8);
+    const bitIndex = 7 - (totalBitIndex % 8);
+    newBuffer[byteIndex] |= Number(bit) << bitIndex;
+  }
+
+  for (let i = 0; i < newBuffer.length; i++) {
+    buffer[Math.floor(bitOffset / 8) + i] |= newBuffer[i];
+  }
+
+  return buffer;
+}
+
+// Function to read bits from a buffer
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -80,26 +87,27 @@ class BinaryHandler {
     if (typeof keyOrValue === 'string') {
       // Read mode
       const byteLength = Math.ceil((this.bitCursor + length) / 8);
-      if (byteLength > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
+      if (this.cursor + byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - (this._buffer.length - this.cursor))]);
       }
 
-      const buffer = this._buffer.slice(this.bitCursor / 8, this.bitCursor / 8 + byteLength);
-      const value = readBits(length, buffer);
-
+      const value = readBits(length, this._buffer.slice(this.cursor), this.bitCursor);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor += length;
-      this.cursor += Math.ceil(this.bitCursor / 8);
+      this.cursor += Math.floor(this.bitCursor / 8);
+      this.bitCursor %= 8;
       return this;
     } else {
       // Write mode
       const value = BigInt(keyOrValue);
-      const buffer = writeBits(length, value);
-      this._buffer = Buffer.concat([this._buffer.slice(0, this.cursor), buffer, this._buffer.slice(this.cursor + Math.ceil(length / 8))]);
-      this.cursor += Math.ceil(length / 8);
+      if (this.cursor + Math.ceil((this.bitCursor + length) / 8) > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(this.cursor + Math.ceil((this.bitCursor + length) / 8) - this._buffer.length)]);
+      }
+      this._buffer = writeBits(length, value, this._buffer, this.cursor * 8 + this.bitCursor);
       this.bitCursor += length;
+      this.cursor += Math.floor(this.bitCursor / 8);
+      this.bitCursor %= 8;
 
-      // Write the buffer to the file
       if (this.fd !== null) {
         writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
       }
@@ -199,7 +207,11 @@ class BinaryHandler {
   _readBytes(length, opts = {}) {
     try {
       this._validateLength(length);
-      this._ensureBytes(length);
+      const stats = fstatSync(this.fd);
+      if (this.cursor + length > stats.size) {
+        throw new Error('Insufficient data in file');
+      }
+
       const buffer = Buffer.alloc(length);
       readSync(this.fd, buffer, 0, length, this.cursor);
       if (opts.decode && ETEXT) {
