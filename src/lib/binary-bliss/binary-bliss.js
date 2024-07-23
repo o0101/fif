@@ -21,59 +21,54 @@ const BinaryType = {
   BUFFER: 8,
 };
 
-class BitHandler {
-  constructor(size) {
-    this.size = size;
-    this.buffer = new Uint8Array(Math.ceil(size / 8));
-    this.bitCursor = 0;
+// Function to write bits into a buffer
+function writeBits(length, value) {
+  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+    throw new Error('Length must be a positive integer');
   }
 
-  _setBit(index, value) {
-    const byteIndex = Math.floor(index / 8);
-    const bitIndex = index % 8;
-    if (value) {
-      this.buffer[byteIndex] |= (1 << (7 - bitIndex));
-    } else {
-      this.buffer[byteIndex] &= ~(1 << (7 - bitIndex));
-    }
+  value = BigInt(value);
+  console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2).padStart(length, '0')}`);
+
+  const byteLength = Math.ceil(length / 8);
+  const buffer = Buffer.alloc(byteLength);
+
+  for (let i = 0; i < length; i++) {
+    const bit = (value >> BigInt(length - 1 - i)) & 1n;
+    const byteIndex = Math.floor(i / 8);
+    const bitIndex = 7 - (i % 8);
+    buffer[byteIndex] |= Number(bit) << bitIndex;
+    console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, buffer[${byteIndex}]: ${buffer[byteIndex].toString(2).padStart(8, '0')})`);
   }
 
-  _getBit(index) {
-    const byteIndex = Math.floor(index / 8);
-    const bitIndex = index % 8;
-    return (this.buffer[byteIndex] >> (7 - bitIndex)) & 1;
+  console.log(`Final buffer: ${buffer.toString('hex')}`);
+  return buffer;
+}
+
+// Function to read bits from a buffer
+function readBits(length, buffer) {
+  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+    throw new Error('Length must be a positive integer');
   }
 
-  writeBits(value, length) {
-    if (typeof value !== 'bigint') {
-      value = BigInt(value);
-    }
-    for (let i = 0; i < length; i++) {
-      const bit = (value >> BigInt(length - 1 - i)) & 1n;
-      this._setBit(this.bitCursor++, Number(bit));
-    }
+  const byteLength = Math.ceil(length / 8);
+  if (!Buffer.isBuffer(buffer) || buffer.length < byteLength) {
+    throw new Error('Buffer is too small for the specified length');
   }
 
-  readBits(length) {
-    let value = 0n;
-    for (let i = 0; i < length; i++) {
-      const bit = this._getBit(this.bitCursor++);
-      value = (value << 1n) | BigInt(bit);
-    }
-    return value;
+  let value = 0n;
+  console.log(`\nReading bits for length: ${length}, buffer: ${buffer.toString('hex')}`);
+
+  for (let i = 0; i < length; i++) {
+    const byteIndex = Math.floor(i / 8);
+    const bitIndex = 7 - (i % 8);
+    const bit = (buffer[byteIndex] >> bitIndex) & 1;
+    value = (value << 1n) | BigInt(bit);
+    console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, value: ${value.toString(2).padStart(length, '0')})`);
   }
 
-  resetCursor() {
-    this.bitCursor = 0;
-  }
-
-  setBuffer(buffer) {
-    this.buffer = new Uint8Array(buffer);
-  }
-
-  getBuffer() {
-    return Buffer.from(this.buffer);
-  }
+  console.log(`Final value: ${value.toString(2).padStart(length, '0')}`);
+  return value;
 }
 
 class BinaryHandler {
@@ -81,35 +76,28 @@ class BinaryHandler {
     this.endian = endian;
     this._buffer = Buffer.alloc(0);
     this.cursor = 0;
-    this.bitHandler = new BitHandler(0); // Initialize BitHandler with size 0
     this.reading = [];
     this.fd = null;
   }
 
   bit(length, keyOrValue) {
-    const requiredSize = this.cursor * 8 + length;
-    if (this.bitHandler.size < requiredSize) {
-      this.bitHandler.size = requiredSize;
-      this.bitHandler.setBuffer(this._buffer.slice(this.cursor, this.cursor + Math.ceil(requiredSize / 8)));
-    }
-
     if (typeof keyOrValue === 'string') {
       // Read mode
-      this.bitHandler.resetCursor();
-      const value = this.bitHandler.readBits(length);
+      const buffer = this._buffer.slice(this.cursor, this.cursor + Math.ceil(length / 8));
+      const value = readBits(length, buffer);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
-      this.cursor += Math.ceil((this.bitHandler.bitCursor + 7) / 8);
+      this.cursor += Math.ceil(length / 8);
       return this;
     } else {
       // Write mode
       const value = BigInt(keyOrValue);
-      this.bitHandler.resetCursor();
-      this.bitHandler.writeBits(value, length);
-      const newBuffer = this.bitHandler.getBuffer();
-      this._buffer = Buffer.concat([this._buffer.slice(0, this.cursor), newBuffer]);
-      this.cursor += Math.ceil((this.bitHandler.bitCursor + 7) / 8);
+      const buffer = writeBits(length, value);
+      this._buffer = Buffer.concat([this._buffer.slice(0, this.cursor), buffer, this._buffer.slice(this.cursor + Math.ceil(length / 8))]);
+      this.cursor += Math.ceil(length / 8);
       // Write the buffer to the file
-      writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
+      if (this.fd !== null) {
+        writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
+      }
       return this;
     }
   }
@@ -519,7 +507,6 @@ class BinaryHandler {
 
   jump(cursorPosition) {
     this.cursor = cursorPosition;
-    this.bitCursor = 0; // Reset bit cursor when jumping
     return this;
   }
 
