@@ -36,8 +36,8 @@ class BinaryHandler {
     if ( this._buffer.length ) {
       this._writeBytes(this._buffer);
       this.cursor += this._buffer.length;
-      this.bitCursor = 0;
       this._buffer = Buffer.alloc(0);
+      this.bitCursor = 0;
     }
   }
 
@@ -244,6 +244,7 @@ class BinaryHandler {
   }
 
   _writeBytes(buffer, opts = {}) {
+    if ( ! buffer.length ) return;
     try {
       this._validateBuffer(buffer);
       if (opts.encode && ETEXT) {
@@ -430,7 +431,6 @@ class BinaryHandler {
   }
 
   uint16(keyOrValue) {
-    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(2);
       const buffer = this._readBytes(2);
@@ -438,6 +438,7 @@ class BinaryHandler {
       this.reading.push({ key: keyOrValue, value, type: 'uint16' });
       return this;
     } else {
+      this._alignToNextByte();
       const value = keyOrValue;
       const buffer = Buffer.alloc(2);
       if (this.endian === 'BE') {
@@ -472,7 +473,6 @@ class BinaryHandler {
   }
 
   uint32(keyOrValue) {
-    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(4);
       const buffer = this._readBytes(4);
@@ -480,6 +480,7 @@ class BinaryHandler {
       this.reading.push({ key: keyOrValue, value, type: 'uint32' });
       return this;
     } else {
+      this._alignToNextByte();
       const value = keyOrValue;
       const buffer = Buffer.alloc(4);
       if (this.endian === 'BE') {
