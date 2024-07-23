@@ -89,7 +89,7 @@ class BinaryHandler {
 
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor += length;
-      this.cursor = Math.ceil(this.bitCursor / 8);
+      this.cursor += Math.ceil(this.bitCursor / 8);
       return this;
     } else {
       // Write mode
@@ -171,7 +171,6 @@ class BinaryHandler {
 
   _seek(offset) {
     this.cursor = offset;
-    this.bitCursor = 0;
   }
 
   _validateLength(length) {
@@ -514,7 +513,7 @@ class BinaryHandler {
 
   jump(cursorPosition) {
     this.cursor = cursorPosition;
-    this.butCursor = 0;
+    this.bitCursor = 0;
     return this;
   }
 

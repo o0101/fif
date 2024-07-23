@@ -20,52 +20,52 @@ function saveKeys() {
 saveKeys();
 
 // helpers
-  function cleanUp(filePath, actuallyDo = true) {
-    if ( ! actuallyDo ) return;
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
-    }
+function cleanUp(filePath, actuallyDo = true) {
+  if ( ! actuallyDo ) return;
+  if (existsSync(filePath)) {
+    unlinkSync(filePath);
+  }
+}
+
+function assertEqual(expected, actual, message) {
+  if (expected != actual) {
+    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+  } else {
+    console.log(`${greenCheck} Test passed: ${message}`);
+  }
+}
+
+function assertNestedArrayEqual(expected, actual, message) {
+  if (!Array.isArray(expected) || !Array.isArray(actual)) {
+    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+    return;
   }
 
-  function assertEqual(expected, actual, message) {
-    if (expected != actual) {
-      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+  if (expected.length !== actual.length) {
+    console.error(`${redCross} Test failed: ${message}\nExpected length: ${expected.length}\nActual length: ${actual.length}`);
+    return;
+  }
+
+  for (let i = 0; i < expected.length; i++) {
+    if (Array.isArray(expected[i]) && Array.isArray(actual[i])) {
+      assertNestedArrayEqual(expected[i], actual[i], `${message} (index ${i})`);
+    } else if (expected[i] instanceof Date && actual[i] instanceof Date) {
+      assertEqual(expected[i].toISOString(), actual[i].toISOString(), `${message} (index ${i})`);
+    } else if (typeof expected[i] === 'object' && typeof actual[i] === 'object') {
+      assertEqual(JSON.stringify(expected[i]), JSON.stringify(actual[i]), `${message} (index ${i})`);
     } else {
-      console.log(`${greenCheck} Test passed: ${message}`);
+      assertEqual(expected[i], actual[i], `${message} (index ${i})`);
     }
   }
- 
-  function assertNestedArrayEqual(expected, actual, message) {
-    if (!Array.isArray(expected) || !Array.isArray(actual)) {
-      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
-      return;
-    }
+}
 
-    if (expected.length !== actual.length) {
-      console.error(`${redCross} Test failed: ${message}\nExpected length: ${expected.length}\nActual length: ${actual.length}`);
-      return;
-    }
-
-    for (let i = 0; i < expected.length; i++) {
-      if (Array.isArray(expected[i]) && Array.isArray(actual[i])) {
-        assertNestedArrayEqual(expected[i], actual[i], `${message} (index ${i})`);
-      } else if (expected[i] instanceof Date && actual[i] instanceof Date) {
-        assertEqual(expected[i].toISOString(), actual[i].toISOString(), `${message} (index ${i})`);
-      } else if (typeof expected[i] === 'object' && typeof actual[i] === 'object') {
-        assertEqual(JSON.stringify(expected[i]), JSON.stringify(actual[i]), `${message} (index ${i})`);
-      } else {
-        assertEqual(expected[i], actual[i], `${message} (index ${i})`);
-      }
-    }
+function assertBufferEqual(expected, actual, message) {
+  if (Buffer.compare(expected, actual) !== 0) {
+    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
+  } else {
+    console.log(`${greenCheck} Test passed: ${message}`);
   }
-
-  function assertBufferEqual(expected, actual, message) {
-    if (Buffer.compare(expected, actual) !== 0) {
-      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
-    } else {
-      console.log(`${greenCheck} Test passed: ${message}`);
-    }
-  }
+}
 
 function testColorType() {
   console.log('Testing Color Type');
@@ -105,6 +105,49 @@ function testColorType() {
   }
 
   handler.closeFile();
+}
+
+function testInterleavedBitFields() {
+  console.log('Testing Interleaved Bit Fields');
+
+  const filePath = path.join('interleaved_bit_fields.bin');
+  const bh = new BinaryHandler();
+  bh.openFile(filePath);
+
+  // Writing interleaved bit fields and other types
+  bh.bit(3, 5);    // 3 bits with value 5 (101 in binary)
+  bh.uint32(1024); // 32-bit integer with value 1024
+  bh.bit(5, 19);   // 5 bits with value 19 (10011 in binary)
+  bh.uint16(65535);// 16-bit integer with value 65535
+  bh.bit(7, 77);   // 7 bits with value 77 (1001101 in binary)
+
+  // Reset buffer for reading
+  bh.cursor = 0;
+  bh.bitCursor = 0;
+
+  // Reading interleaved bit fields and other types
+  bh.bit(3, 'bit3');
+  bh.uint32('uint32');
+  bh.bit(5, 'bit5');
+  bh.uint16('uint16');
+  bh.bit(7, 'bit7');
+
+  const result = bh.read();
+  assertEqual(5, result.bit3.value, 'Interleaved Bit3 value');
+  assertEqual(1024, result.uint32.value, 'Interleaved Uint32 value');
+  assertEqual(19, result.bit5.value, 'Interleaved Bit5 value');
+  assertEqual(65535, result.uint16.value, 'Interleaved Uint16 value');
+  assertEqual(77, result.bit7.value, 'Interleaved Bit7 value');
+
+  // Sign and verify the file
+  bh.signFile('private.key');
+  if (!bh.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  bh.closeFile();
 }
 
 function testBitFields() {
@@ -914,6 +957,7 @@ function runTests() {
   testBitFieldCrossByteBoundary();
   // Run the enhanced bit field tests
   enhancedBitFieldTests();
+  testInterleavedBitFields(); // Run the interleaved bit fields tests
   testBufferType();
   testMagicNumber();
   testMagicString();
