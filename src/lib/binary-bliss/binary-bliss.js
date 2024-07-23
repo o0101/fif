@@ -9,7 +9,7 @@ const ATextDecoder = new TextDecoder;
 const ETEXT = true;
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
-const DEBUG = true;
+const DEBUG = false;
 
 const BinaryType = {
   STRING: 1,
@@ -104,31 +104,26 @@ class BinaryHandler {
   }
 
   bit(length, keyOrValue) {
+    const cursor = Math.floor(this.bitCursor/8);
     if (typeof keyOrValue === 'string') {
       // Read mode
       const byteLength = Math.ceil((this.bitCursor + length) / 8);
-      const len = this.cursor + byteLength;
-      if (len > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, this._readBytes(len - this._buffer.length)]);
+      if ((cursor + byteLength) > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - (this._buffer.length - cursor))]);
       }
 
-      const value = this.readBits(length, this._buffer, this.bitCursor);
+      const value = this.readBits(length, this._buffer.slice(cursor), this.bitCursor);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor += length;
-      this.cursor = len - 1;
-      this.bitCursor %= 8;
       return this;
     } else {
       // Write mode
       const value = BigInt(keyOrValue);
-      const len = this.cursor + Math.ceil((this.bitCursor + length) / 8);
-      if (len > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(len - this._buffer.length)]);
+      if (cursor + Math.ceil((this.bitCursor + length) / 8) > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(cursor + Math.ceil((this.bitCursor + length) / 8) - this._buffer.length)]);
       }
-      this._buffer = this.writeBits(length, value, this._buffer, this.bitCursor);
+      this._buffer = this.writeBits(length, value, this._buffer, cursor * 8 + this.bitCursor);
       this.bitCursor += length;
-      this.cursor = len - 1;
-      this.bitCursor %= 8;
 
       return this;
     }

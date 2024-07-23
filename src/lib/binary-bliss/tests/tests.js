@@ -138,7 +138,7 @@ function testInterleavedBitFields() {
   assertEqual(1024, result.uint32.value, 'Interleaved Uint32 value');
   assertEqual(19, result.bit5.value, 'Interleaved Bit5 value');
   assertEqual(65535, result.uint16.value, 'Interleaved Uint16 value');
-  //assertEqual(77, result.bit7.value, 'Interleaved Bit7 value');
+  assertEqual(77, result.bit7.value, 'Interleaved Bit7 value');
 
   // Sign and verify the file
   bh.signFile('private.key');
@@ -938,6 +938,13 @@ function testFailVerify() {
   handler.closeFile();
 }
 
+function bitTests() {
+  testBitFields();
+  testBitFieldCrossByteBoundary();
+  enhancedBitFieldTests();
+  //testInterleavedBitFields(); // Run the interleaved bit fields tests
+}
+
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
@@ -967,21 +974,6 @@ function runTests() {
   cleanUp('public.key', true);
 }
 
-function bitTests() {
-  readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
-
-  testBitFields();
-  //testBitFieldCrossByteBoundary();
-  // Run the enhanced bit field tests
-  //enhancedBitFieldTests();
-  //testInterleavedBitFields(); // Run the interleaved bit fields tests
-
-  //cleanUp('private.key', true);
-  //cleanUp('public.key', true);
-}
-
-
-bitTests();
-//runTests();
+runTests();
 
 
