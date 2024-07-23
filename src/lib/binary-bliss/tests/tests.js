@@ -133,10 +133,10 @@ function testBitFields() {
 
   const result = bh.read();
   console.log(result);
-  assertEqual(result.bit1.value, 1, 'Bit1 value');
-  assertEqual(result.bit3.value, 5, 'Bit3 value');
-  assertEqual(result.bit4.value, 9, 'Bit4 value');
-  assertEqual(result.bit8.value, 255, 'Bit8 value');
+  assertEqual(1, result.bit1.value, 'Bit1 value');
+  assertEqual(5, result.bit3.value, 'Bit3 value');
+  assertEqual(9, result.bit4.value, 'Bit4 value');
+  assertEqual(255, result.bit8.value, 'Bit8 value');
 
   // Sign and verify the file
   bh.signFile('private.key');
@@ -172,9 +172,9 @@ function testBitFieldCrossByteBoundary() {
   bh.bit(12, 'bit12');
 
   const result = bh.read();
-  assertEqual(result.bit4.value, 15, 'Bit4 value');
-  assertEqual(result.bit8.value, 170, 'Bit8 value');
-  assertEqual(result.bit12.value, 4095, 'Bit12 value');
+  assertEqual(15, result.bit4.value, 'Bit4 value');
+  assertEqual(170, result.bit8.value, 'Bit8 value');
+  assertEqual(4095, result.bit12.value, 'Bit12 value');
 
   // Sign and verify the file
   bh.signFile('private.key');
@@ -186,6 +186,7 @@ function testBitFieldCrossByteBoundary() {
 
   bh.closeFile();
 }
+
 function testMapType() {
   console.log('Testing Map Type');
 

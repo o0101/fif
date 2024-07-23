@@ -21,14 +21,97 @@ const BinaryType = {
   BUFFER: 8,
 };
 
+class BitHandler {
+  constructor(size) {
+    this.size = size;
+    this.buffer = new Uint8Array(Math.ceil(size / 8));
+    this.bitCursor = 0;
+  }
+
+  _setBit(index, value) {
+    const byteIndex = Math.floor(index / 8);
+    const bitIndex = index % 8;
+    if (value) {
+      this.buffer[byteIndex] |= (1 << (7 - bitIndex));
+    } else {
+      this.buffer[byteIndex] &= ~(1 << (7 - bitIndex));
+    }
+  }
+
+  _getBit(index) {
+    const byteIndex = Math.floor(index / 8);
+    const bitIndex = index % 8;
+    return (this.buffer[byteIndex] >> (7 - bitIndex)) & 1;
+  }
+
+  writeBits(value, length) {
+    if (typeof value !== 'bigint') {
+      value = BigInt(value);
+    }
+    for (let i = 0; i < length; i++) {
+      const bit = (value >> BigInt(length - 1 - i)) & 1n;
+      this._setBit(this.bitCursor++, Number(bit));
+    }
+  }
+
+  readBits(length) {
+    let value = 0n;
+    for (let i = 0; i < length; i++) {
+      const bit = this._getBit(this.bitCursor++);
+      value = (value << 1n) | BigInt(bit);
+    }
+    return value;
+  }
+
+  resetCursor() {
+    this.bitCursor = 0;
+  }
+
+  setBuffer(buffer) {
+    this.buffer = new Uint8Array(buffer);
+  }
+
+  getBuffer() {
+    return Buffer.from(this.buffer);
+  }
+}
+
 class BinaryHandler {
   constructor(endian = 'BE') {
     this.endian = endian;
     this._buffer = Buffer.alloc(0);
     this.cursor = 0;
-    this.bitCursor = 0;
+    this.bitHandler = new BitHandler(0); // Initialize BitHandler with size 0
     this.reading = [];
     this.fd = null;
+  }
+
+  bit(length, keyOrValue) {
+    const requiredSize = this.cursor * 8 + length;
+    if (this.bitHandler.size < requiredSize) {
+      this.bitHandler.size = requiredSize;
+      this.bitHandler.setBuffer(this._buffer.slice(this.cursor, this.cursor + Math.ceil(requiredSize / 8)));
+    }
+
+    if (typeof keyOrValue === 'string') {
+      // Read mode
+      this.bitHandler.resetCursor();
+      const value = this.bitHandler.readBits(length);
+      this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
+      this.cursor += Math.ceil((this.bitHandler.bitCursor + 7) / 8);
+      return this;
+    } else {
+      // Write mode
+      const value = BigInt(keyOrValue);
+      this.bitHandler.resetCursor();
+      this.bitHandler.writeBits(value, length);
+      const newBuffer = this.bitHandler.getBuffer();
+      this._buffer = Buffer.concat([this._buffer.slice(0, this.cursor), newBuffer]);
+      this.cursor += Math.ceil((this.bitHandler.bitCursor + 7) / 8);
+      // Write the buffer to the file
+      writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
+      return this;
+    }
   }
 
   setEndian(endian) {
@@ -264,41 +347,6 @@ class BinaryHandler {
         throw new Error('Unknown type in _readTypeAndValue');
     }
     return value;
-  }
-
-  bit(length, keyOrValue) {
-    this._validateLength(length);
-
-    if (typeof keyOrValue === 'string') {
-      let value = 0;
-      for (let i = 0; i < length; i++) {
-        if (this.bitCursor === 0) {
-          this._ensureBytes(1);
-        }
-        const bit = (this._buffer[this.cursor] >> (7 - this.bitCursor)) & 1;
-        value = (value << 1) | bit;
-        this.bitCursor = (this.bitCursor + 1) % 8;
-        if (this.bitCursor === 0) {
-          this.cursor++;
-        }
-      }
-      this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
-      return this;
-    } else {
-      const value = keyOrValue;
-      for (let i = 0; i < length; i++) {
-        if (this.bitCursor === 0) {
-          this._buffer = Buffer.concat([this._buffer, Buffer.alloc(1)]);
-        }
-        const bit = (value >> (length - 1 - i)) & 1;
-        this._buffer[this.cursor] |= bit << (7 - this.bitCursor);
-        this.bitCursor = (this.bitCursor + 1) % 8;
-        if (this.bitCursor === 0) {
-          this.cursor++;
-        }
-      }
-      return this;
-    }
   }
 
   int8(keyOrValue) {
