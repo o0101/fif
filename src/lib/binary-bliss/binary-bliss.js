@@ -21,7 +21,6 @@ const BinaryType = {
   BUFFER: 8,
 };
 
-
 function readBits(length, buffer, bitOffset = 0) {
   if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
     throw new Error('Length must be a positive integer');
@@ -45,7 +44,6 @@ function readBits(length, buffer, bitOffset = 0) {
   return value;
 }
 
-// Function to write bits into a buffer
 function writeBits(length, value, buffer, bitOffset = 0) {
   if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
     throw new Error('Length must be a positive integer');
@@ -70,8 +68,6 @@ function writeBits(length, value, buffer, bitOffset = 0) {
 
   return buffer;
 }
-
-// Function to read bits from a buffer
 
 class BinaryHandler {
   constructor(endian = 'BE') {
