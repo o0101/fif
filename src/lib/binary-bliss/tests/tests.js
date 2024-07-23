@@ -119,6 +119,7 @@ function testBitFields() {
   bh.bit(3, 5); // Write three bits with value 5 (101 in binary)
   bh.bit(4, 9); // Write four bits with value 9 (1001 in binary)
   bh.bit(8, 255); // Write eight bits with value 255 (11111111 in binary)
+  bh.bit(200, 988888888888888347856348573468937253482675n);
 
   // Reset buffer for reading
   bh.cursor = 0;
@@ -130,13 +131,14 @@ function testBitFields() {
   bh.bit(3, 'bit3');
   bh.bit(4, 'bit4');
   bh.bit(8, 'bit8');
+  bh.bit(200, 'bit200');
 
   const result = bh.read();
-  console.log(result);
   assertEqual(1, result.bit1.value, 'Bit1 value');
   assertEqual(5, result.bit3.value, 'Bit3 value');
   assertEqual(9, result.bit4.value, 'Bit4 value');
   assertEqual(255, result.bit8.value, 'Bit8 value');
+  assertEqual(988888888888888347856348573468937253482675n, result.bit200.value, 'Bit200 value');
 
   // Sign and verify the file
   bh.signFile('private.key');

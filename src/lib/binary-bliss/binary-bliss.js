@@ -28,7 +28,6 @@ function writeBits(length, value) {
   }
 
   value = BigInt(value);
-  console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2).padStart(length, '0')}`);
 
   const byteLength = Math.ceil(length / 8);
   const buffer = Buffer.alloc(byteLength);
@@ -38,10 +37,8 @@ function writeBits(length, value) {
     const byteIndex = Math.floor(i / 8);
     const bitIndex = 7 - (i % 8);
     buffer[byteIndex] |= Number(bit) << bitIndex;
-    console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, buffer[${byteIndex}]: ${buffer[byteIndex].toString(2).padStart(8, '0')})`);
   }
 
-  console.log(`Final buffer: ${buffer.toString('hex')}`);
   return buffer;
 }
 
@@ -57,17 +54,14 @@ function readBits(length, buffer) {
   }
 
   let value = 0n;
-  console.log(`\nReading bits for length: ${length}, buffer: ${buffer.toString('hex')}`);
 
   for (let i = 0; i < length; i++) {
     const byteIndex = Math.floor(i / 8);
     const bitIndex = 7 - (i % 8);
     const bit = (buffer[byteIndex] >> bitIndex) & 1;
     value = (value << 1n) | BigInt(bit);
-    console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, value: ${value.toString(2).padStart(length, '0')})`);
   }
 
-  console.log(`Final value: ${value.toString(2).padStart(length, '0')}`);
   return value;
 }
 
