@@ -122,8 +122,7 @@ function testInterleavedBitFields() {
   bh.bit(7, 77);   // 7 bits with value 77 (1001101 in binary)
 
   // Reset buffer for reading
-  bh.cursor = 0;
-  bh.bitCursor = 0;
+  bh.jump(0);
 
   // Reading interleaved bit fields and other types
   bh.bit(3, 'bit3');
@@ -165,9 +164,7 @@ function testBitFields() {
   bh.bit(200, 988888888888888347856348573468937253482675n);
 
   // Reset buffer for reading
-  bh.cursor = 0;
-  bh.bitCursor = 0;
-  //bh.reading = [];
+  bh.jump(0);
 
   // Reading bit fields
   bh.bit(1, 'bit1');
@@ -207,9 +204,7 @@ function testBitFieldCrossByteBoundary() {
   bh.bit(12, 4095); // Write twelve bits with value 4095 (111111111111 in binary)
 
   // Reset buffer for reading
-  bh.cursor = 0;
-  bh.bitCursor = 0;
-  //bh.reading = [];
+  bh.jump(0);
 
   // Reading bit fields
   bh.bit(4, 'bit4');
