@@ -35,11 +35,9 @@ class BinaryHandler {
   _alignToNextByte() {
     if ( this._buffer.length ) {
       this._writeBytes(this._buffer);
-      this._buffer = Buffer.alloc(0);
-    }
-    if (this.bitCursor > 0) {
-      this.cursor += Math.ceil(this.bitCursor/8);
+      this.cursor += this._buffer.length;
       this.bitCursor = 0;
+      this._buffer = Buffer.alloc(0);
     }
   }
 
@@ -105,24 +103,25 @@ class BinaryHandler {
 
   bit(length, keyOrValue) {
     const cursor = Math.floor(this.bitCursor/8);
+    const offset = this.bitCursor % 8;
+    const byteLength = Math.ceil((this.bitCursor + length) / 8);
     if (typeof keyOrValue === 'string') {
       // Read mode
-      const byteLength = Math.ceil((this.bitCursor + length) / 8);
-      if ((cursor + byteLength) > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - (this._buffer.length - cursor))]);
+      if (byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
       }
 
-      const value = this.readBits(length, this._buffer.slice(cursor), this.bitCursor);
+      const value = this.readBits(length, this._buffer.slice(cursor), offset);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor += length;
       return this;
     } else {
       // Write mode
       const value = BigInt(keyOrValue);
-      if (cursor + Math.ceil((this.bitCursor + length) / 8) > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(cursor + Math.ceil((this.bitCursor + length) / 8) - this._buffer.length)]);
+      if (byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(byteLength - this._buffer.length)]);
       }
-      this._buffer = this.writeBits(length, value, this._buffer, cursor * 8 + this.bitCursor);
+      this._buffer = this.writeBits(length, value, this._buffer, this.bitCursor);
       this.bitCursor += length;
 
       return this;

@@ -942,7 +942,7 @@ function bitTests() {
   testBitFields();
   testBitFieldCrossByteBoundary();
   enhancedBitFieldTests();
-  //testInterleavedBitFields(); // Run the interleaved bit fields tests
+  testInterleavedBitFields(); // Run the interleaved bit fields tests
 }
 
 function runTests() {
