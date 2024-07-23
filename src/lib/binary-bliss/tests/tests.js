@@ -189,6 +189,99 @@ function testBitFieldCrossByteBoundary() {
   bh.closeFile();
 }
 
+function enhancedBitFieldTests() {
+  console.log('Enhanced Bit Field Tests');
+
+  // Test Case 1: Write and Read single bits
+  {
+    const filePath = path.join('bit_fields_single_bit.bin');
+    const bh = new BinaryHandler();
+    bh.openFile(filePath);
+
+    bh.bit(1, 1); // Write a single bit with value 1
+    bh.bit(1, 0); // Write a single bit with value 0
+    bh.jump(0);
+    bh.bit(1, 'bit1');
+    bh.bit(1, 'bit2');
+
+    const result = bh.read();
+    assertEqual(1, result.bit1.value, 'Single Bit 1');
+    assertEqual(0, result.bit2.value, 'Single Bit 2');
+
+    bh.closeFile();
+  }
+
+  // Test Case 2: Write and Read multi-bit values
+  {
+    const filePath = path.join('bit_fields_multi_bit.bin');
+    const bh = new BinaryHandler();
+    bh.openFile(filePath);
+
+    bh.bit(3, 5); // Write three bits with value 5 (101 in binary)
+    bh.bit(4, 9); // Write four bits with value 9 (1001 in binary)
+    bh.jump(0);
+    bh.bit(3, 'bit3');
+    bh.bit(4, 'bit4');
+
+    const result = bh.read();
+    assertEqual(5, result.bit3.value, 'Multi Bit 3');
+    assertEqual(9, result.bit4.value, 'Multi Bit 4');
+
+    bh.closeFile();
+  }
+
+  // Test Case 3: Write and Read large bit values
+  {
+    const filePath = path.join('bit_fields_large_value.bin');
+    const bh = new BinaryHandler();
+    bh.openFile(filePath);
+
+    bh.bit(64, 123456789123456789n); // Write 64 bits with a large value
+    bh.jump(0);
+    bh.bit(64, 'bit64');
+
+    const result = bh.read();
+    assertEqual(123456789123456789n, result.bit64.value, 'Large Bit Value');
+
+    bh.closeFile();
+  }
+
+  // Test Case 4: Write and Read across byte boundaries
+  {
+    const filePath = path.join('bit_fields_cross_byte_boundary.bin');
+    const bh = new BinaryHandler();
+    bh.openFile(filePath);
+
+    bh.bit(12, 4095); // Write twelve bits with value 4095 (111111111111 in binary)
+    bh.jump(0);
+    bh.bit(12, 'bit12');
+
+    const result = bh.read();
+    assertEqual(4095, result.bit12.value, 'Bit Value Across Byte Boundary');
+
+    bh.closeFile();
+  }
+
+  // Test Case 5: Write and Read mixed bit values
+  {
+    const filePath = path.join('bit_fields_mixed_values.bin');
+    const bh = new BinaryHandler();
+    bh.openFile(filePath);
+
+    bh.bit(5, 19); // Write five bits with value 19 (10011 in binary)
+    bh.bit(7, 77); // Write seven bits with value 77 (1001101 in binary)
+    bh.jump(0);
+    bh.bit(5, 'bit5');
+    bh.bit(7, 'bit7');
+
+    const result = bh.read();
+    assertEqual(19, result.bit5.value, 'Mixed Bit 5');
+    assertEqual(77, result.bit7.value, 'Mixed Bit 7');
+
+    bh.closeFile();
+  }
+}
+
 function testMapType() {
   console.log('Testing Map Type');
 
@@ -819,6 +912,8 @@ function runTests() {
   testColorType();
   testBitFields();
   testBitFieldCrossByteBoundary();
+  // Run the enhanced bit field tests
+  enhancedBitFieldTests();
   testBufferType();
   testMagicNumber();
   testMagicString();
