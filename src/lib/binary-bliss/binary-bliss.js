@@ -21,63 +21,6 @@ const BinaryType = {
   SET: 7,
   BUFFER: 8,
 };
-// Function to write bits into a buffer with bitOffset
-function writeBits(length, value, buffer, bitOffset = 0) {
-  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
-    throw new Error('Length must be a positive integer');
-  }
-
-  value = BigInt(value);
-  DEBUG && console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2)}, bitOffset: ${bitOffset}`);
-
-  const startByte = Math.floor(bitOffset / 8);
-  const startBit = bitOffset % 8;
-  const byteLength = Math.ceil((startBit + length) / 8);
-
-  if (!Buffer.isBuffer(buffer) || buffer.length < startByte + byteLength) {
-    throw new Error('Buffer is too small for the specified length and bitOffset');
-  }
-
-  for (let i = 0; i < length; i++) {
-    const bit = (value >> BigInt(length - 1 - i)) & 1n;
-    const byteIndex = startByte + Math.floor((startBit + i) / 8);
-    const bitIndex = 7 - ((startBit + i) % 8);
-    buffer[byteIndex] |= Number(bit) << bitIndex;
-    DEBUG && console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, buffer[${byteIndex}]: ${buffer[byteIndex].toString(2).padStart(8, '0')})`);
-  }
-
-  DEBUG && console.log(`Final buffer: ${buffer.toString('hex')}`);
-  return buffer;
-}
-
-// Function to read bits from a buffer with bitOffset
-function readBits(length, buffer, bitOffset = 0) {
-  if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
-    throw new Error('Length must be a positive integer');
-  }
-
-  const startByte = Math.floor(bitOffset / 8);
-  const startBit = bitOffset % 8;
-  const byteLength = Math.ceil((startBit + length) / 8);
-
-  if (!Buffer.isBuffer(buffer) || buffer.length < startByte + byteLength) {
-    throw new Error('Buffer is too small for the specified length and bitOffset');
-  }
-
-  let value = 0n;
-  DEBUG && console.log(`\nReading bits for length: ${length}, buffer: ${buffer.toString('hex')}, bitOffset: ${bitOffset}`);
-
-  for (let i = 0; i < length; i++) {
-    const byteIndex = startByte + Math.floor((startBit + i) / 8);
-    const bitIndex = 7 - ((startBit + i) % 8);
-    const bit = (buffer[byteIndex] >> bitIndex) & 1;
-    value = (value << 1n) | BigInt(bit);
-    DEBUG && console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, value: ${value.toString(2).padStart(length, '0')})`);
-  }
-
-  DEBUG && console.log(`Final value: ${value.toString(2)}`);
-  return value;
-}
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -89,34 +32,104 @@ class BinaryHandler {
     this.fd = null;
   }
 
+  _alignToNextByte() {
+    if ( this._buffer.length ) {
+      this._writeBytes(this._buffer);
+      this._buffer = Buffer.alloc(0);
+    }
+    if (this.bitCursor > 0) {
+      this.cursor += Math.ceil(this.bitCursor/8);
+      this.bitCursor = 0;
+    }
+  }
+
+  // Function to write bits into a buffer with bitOffset
+  writeBits(length, value, buffer, bitOffset = 0) {
+    if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+      throw new Error('Length must be a positive integer');
+    }
+
+    value = BigInt(value);
+    DEBUG && console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2)}, bitOffset: ${bitOffset}`);
+
+    const startByte = Math.floor(bitOffset / 8);
+    const startBit = bitOffset % 8;
+    const byteLength = Math.ceil((startBit + length) / 8);
+
+    if (!Buffer.isBuffer(buffer) || buffer.length < (startByte + byteLength)) {
+      console.error({startByte, byteLength, buffer}, this);
+      throw new Error('Buffer is too small for the specified length and bitOffset');
+    }
+
+    for (let i = 0; i < length; i++) {
+      const bit = (value >> BigInt(length - 1 - i)) & 1n;
+      const byteIndex = startByte + Math.floor((startBit + i) / 8);
+      const bitIndex = 7 - ((startBit + i) % 8);
+      buffer[byteIndex] |= Number(bit) << bitIndex;
+      DEBUG && console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, buffer[${byteIndex}]: ${buffer[byteIndex].toString(2).padStart(8, '0')})`);
+    }
+
+    DEBUG && console.log(`Final buffer: ${buffer.toString('hex')}`);
+    return buffer;
+  }
+
+  // Function to read bits from a buffer with bitOffset
+  readBits(length, buffer, bitOffset = 0) {
+    if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+      throw new Error('Length must be a positive integer');
+    }
+
+    const startByte = Math.floor(bitOffset / 8);
+    const startBit = bitOffset % 8;
+    const byteLength = Math.ceil((startBit + length) / 8);
+
+    if (!Buffer.isBuffer(buffer) || buffer.length < (startByte + byteLength)) {
+      console.error({buffer, byteLength, startByte, len: buffer.length}, this);
+      throw new Error('Buffer is too small for the specified length and bitOffset');
+    }
+
+    let value = 0n;
+    DEBUG && console.log(`\nReading bits for length: ${length}, buffer: ${buffer.toString('hex')}, bitOffset: ${bitOffset}`);
+
+    for (let i = 0; i < length; i++) {
+      const byteIndex = startByte + Math.floor((startBit + i) / 8);
+      const bitIndex = 7 - ((startBit + i) % 8);
+      const bit = (buffer[byteIndex] >> bitIndex) & 1;
+      value = (value << 1n) | BigInt(bit);
+      DEBUG && console.log(`Bit ${i}: ${bit} (byteIndex: ${byteIndex}, bitIndex: ${bitIndex}, value: ${value.toString(2).padStart(length, '0')})`);
+    }
+
+    DEBUG && console.log(`Final value: ${value.toString(2)}`);
+    return value;
+  }
+
   bit(length, keyOrValue) {
     if (typeof keyOrValue === 'string') {
       // Read mode
       const byteLength = Math.ceil((this.bitCursor + length) / 8);
-      if (this.cursor + byteLength > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - (this._buffer.length - this.cursor))]);
+      const len = this.cursor + byteLength;
+      if (len > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(len - this._buffer.length)]);
       }
 
-      const value = readBits(length, this._buffer.slice(this.cursor), this.bitCursor);
+      const value = this.readBits(length, this._buffer, this.bitCursor);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor += length;
-      this.cursor += Math.floor(this.bitCursor / 8);
+      this.cursor = len - 1;
       this.bitCursor %= 8;
       return this;
     } else {
       // Write mode
       const value = BigInt(keyOrValue);
-      if (this.cursor + Math.ceil((this.bitCursor + length) / 8) > this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(this.cursor + Math.ceil((this.bitCursor + length) / 8) - this._buffer.length)]);
+      const len = this.cursor + Math.ceil((this.bitCursor + length) / 8);
+      if (len > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(len - this._buffer.length)]);
       }
-      this._buffer = writeBits(length, value, this._buffer, this.cursor * 8 + this.bitCursor);
+      this._buffer = this.writeBits(length, value, this._buffer, this.bitCursor);
       this.bitCursor += length;
-      this.cursor += Math.floor(this.bitCursor / 8);
+      this.cursor = len - 1;
       this.bitCursor %= 8;
 
-      if (this.fd !== null) {
-        writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
-      }
       return this;
     }
   }
@@ -185,6 +198,7 @@ class BinaryHandler {
 
   _seek(offset) {
     this.cursor = offset;
+    this.bitCursor = 0;
   }
 
   _validateLength(length) {
@@ -414,6 +428,7 @@ class BinaryHandler {
   }
 
   uint16(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(2);
       const buffer = this._readBytes(2);
@@ -454,6 +469,7 @@ class BinaryHandler {
   }
 
   uint32(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(4);
       const buffer = this._readBytes(4);
