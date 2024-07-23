@@ -9,7 +9,7 @@ const ATextDecoder = new TextDecoder;
 const ETEXT = true;
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
-const DEBUG = false;
+const DEBUG = true;
 
 const BinaryType = {
   STRING: 1,
@@ -153,6 +153,10 @@ class BinaryHandler {
   }
 
   closeFile() {
+    if ( this._buffer.length ) {
+      this._writeBytes(this._buffer);
+      this._buffer = Buffer.alloc(0);
+    }
     if (this.fd !== null) {
       closeSync(this.fd);
       this.fd = null;
@@ -554,6 +558,10 @@ class BinaryHandler {
   }
 
   jump(cursorPosition) {
+    if ( this._buffer.length ) {
+      this._writeBytes(this._buffer);
+      this._buffer = Buffer.alloc(0);
+    }
     this.cursor = cursorPosition;
     this.bitCursor = 0;
     return this;
