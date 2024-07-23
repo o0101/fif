@@ -50,6 +50,7 @@ function readBits(length, buffer) {
 
   const byteLength = Math.ceil(length / 8);
   if (!Buffer.isBuffer(buffer) || buffer.length < byteLength) {
+    console.error({length, buffer});
     throw new Error('Buffer is too small for the specified length');
   }
 
@@ -70,6 +71,7 @@ class BinaryHandler {
     this.endian = endian;
     this._buffer = Buffer.alloc(0);
     this.cursor = 0;
+    this.bitCursor = 0;
     this.reading = [];
     this.fd = null;
   }
@@ -77,10 +79,17 @@ class BinaryHandler {
   bit(length, keyOrValue) {
     if (typeof keyOrValue === 'string') {
       // Read mode
-      const buffer = this._buffer.slice(this.cursor, this.cursor + Math.ceil(length / 8));
+      const byteLength = Math.ceil((this.bitCursor + length) / 8);
+      if (byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
+      }
+
+      const buffer = this._buffer.slice(this.bitCursor / 8, this.bitCursor / 8 + byteLength);
       const value = readBits(length, buffer);
+
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
-      this.cursor += Math.ceil(length / 8);
+      this.bitCursor += length;
+      this.cursor = Math.ceil(this.bitCursor / 8);
       return this;
     } else {
       // Write mode
@@ -88,6 +97,8 @@ class BinaryHandler {
       const buffer = writeBits(length, value);
       this._buffer = Buffer.concat([this._buffer.slice(0, this.cursor), buffer, this._buffer.slice(this.cursor + Math.ceil(length / 8))]);
       this.cursor += Math.ceil(length / 8);
+      this.bitCursor += length;
+
       // Write the buffer to the file
       if (this.fd !== null) {
         writeSync(this.fd, this._buffer, 0, this._buffer.length, 0);
@@ -160,10 +171,12 @@ class BinaryHandler {
 
   _seek(offset) {
     this.cursor = offset;
+    this.bitCursor = 0;
   }
 
   _validateLength(length) {
     if (typeof length !== 'number' || length <= 0 || length > MAX_BUFFER_SIZE) {
+      console.error({length});
       throw new Error('Invalid length');
     }
   }
@@ -501,6 +514,7 @@ class BinaryHandler {
 
   jump(cursorPosition) {
     this.cursor = cursorPosition;
+    this.butCursor = 0;
     return this;
   }
 
