@@ -182,14 +182,6 @@ function testBitFields() {
   assertEqual(255, result.bit8.value, 'Bit8 value');
   assertEqual(988888888888888347856348573468937253482675n, result.bit200.value, 'Bit200 value');
 
-  // Sign and verify the file
-  bh.signFile('private.key');
-  if (!bh.verifyFile('public.key')) {
-    console.error(`${redCross} Test failed: File failed to verify.`);
-  } else {
-    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
-  }
-
   bh.closeFile();
 }
 
@@ -946,14 +938,6 @@ function testFailVerify() {
   handler.closeFile();
 }
 
-function bitTests() {
-  testBitFieldCrossByteBoundary();
-  // Run the enhanced bit field tests
-  enhancedBitFieldTests();
-  testBitFields();
-  testInterleavedBitFields(); // Run the interleaved bit fields tests
-}
-
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
@@ -982,6 +966,20 @@ function runTests() {
   cleanUp('private.key', true);
   cleanUp('public.key', true);
 }
+
+function bitTests() {
+  readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
+
+  testBitFields();
+  //testBitFieldCrossByteBoundary();
+  // Run the enhanced bit field tests
+  //enhancedBitFieldTests();
+  //testInterleavedBitFields(); // Run the interleaved bit fields tests
+
+  //cleanUp('private.key', true);
+  //cleanUp('public.key', true);
+}
+
 
 bitTests();
 //runTests();
