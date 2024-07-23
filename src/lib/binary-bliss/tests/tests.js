@@ -946,38 +946,44 @@ function testFailVerify() {
   handler.closeFile();
 }
 
+function bitTests() {
+  testBitFieldCrossByteBoundary();
+  // Run the enhanced bit field tests
+  enhancedBitFieldTests();
+  testBitFields();
+  testInterleavedBitFields(); // Run the interleaved bit fields tests
+}
+
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
-  //testColorType();
-  //testBitFields();
-  //testBitFieldCrossByteBoundary();
-  //// Run the enhanced bit field tests
-  //enhancedBitFieldTests();
-  testInterleavedBitFields(); // Run the interleaved bit fields tests
-  //testBufferType();
-  //testMagicNumber();
-  //testMagicString();
-  //testMagicBuffer();
-  //testMapType();
-  //testHeteroArray();
-  //testNestedArray();
-  //testDateType();
-  //testFloatType();
-  //testPojoType();
-  //testMixedTypeArray();
-  //testComplexNonLatinObject();
-  //testMapWithPojo();
-  //testPojoWithMap();
-  //testSetType();
-  //testSetWithPojo();
-  //testPojoWithSet();
-  //runGzipTests();
-  //testFailVerify();
+  testColorType();
+  bitTests();
+  testBufferType();
+  testMagicNumber();
+  testMagicString();
+  testMagicBuffer();
+  testMapType();
+  testHeteroArray();
+  testNestedArray();
+  testDateType();
+  testFloatType();
+  testPojoType();
+  testMixedTypeArray();
+  testComplexNonLatinObject();
+  testMapWithPojo();
+  testPojoWithMap();
+  testSetType();
+  testSetWithPojo();
+  testPojoWithSet();
+  runGzipTests();
+  testFailVerify();
 
   cleanUp('private.key', true);
   cleanUp('public.key', true);
 }
 
-runTests();
+bitTests();
+//runTests();
+
 

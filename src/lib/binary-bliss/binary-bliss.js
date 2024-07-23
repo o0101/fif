@@ -268,6 +268,7 @@ class BinaryHandler {
   }
 
   gzip(options) {
+    this._alignToNextByte();
     if (typeof options === 'string') {
       // Reading and decompressing
       const key = options;
@@ -376,6 +377,7 @@ class BinaryHandler {
   }
 
   int8(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(1);
       const buffer = this._readBytes(1);
@@ -392,6 +394,7 @@ class BinaryHandler {
   }
 
   uint8(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(1);
       const buffer = this._readBytes(1);
@@ -408,6 +411,7 @@ class BinaryHandler {
   }
 
   int16(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(2);
       const buffer = this._readBytes(2);
@@ -449,6 +453,7 @@ class BinaryHandler {
   }
 
   int32(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(4);
       const buffer = this._readBytes(4);
@@ -490,6 +495,7 @@ class BinaryHandler {
   }
 
   float(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(4);
       const buffer = this._readBytes(4);
@@ -510,6 +516,7 @@ class BinaryHandler {
   }
 
   double(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(8);
       const buffer = this._readBytes(8);
@@ -530,6 +537,7 @@ class BinaryHandler {
   }
 
   date(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'string') {
       this._ensureBytes(8);
       const buffer = this._readBytes(8);
@@ -552,6 +560,7 @@ class BinaryHandler {
   }
 
   puts(value, len = null, encoding = 'utf8', delimiter = null) {
+    this._alignToNextByte();
     let buffer;
 
     const encodedValue = ATextEncoder.encode(value);
@@ -579,6 +588,7 @@ class BinaryHandler {
   }
 
   gets(keyOrValue, len = null, encoding = 'utf8', delimiter = null) {
+    this._alignToNextByte();
     const key = keyOrValue;
     if (len !== null) {
       this._validateLength(len); // Validate the length
@@ -604,6 +614,7 @@ class BinaryHandler {
   }
 
   array(keyOrValue, length, type, delimiter = null) {
+    this._alignToNextByte();
     this._validateLength(length); // Validate the length
     if (Array.isArray(keyOrValue)) {
       const values = keyOrValue;
@@ -627,6 +638,7 @@ class BinaryHandler {
   }
 
   heteroArray(keyOrValue, delimiter = null) {
+    this._alignToNextByte();
     if (Array.isArray(keyOrValue)) {
       const values = keyOrValue;
       this.uint32(values.length);
@@ -652,6 +664,7 @@ class BinaryHandler {
   }
 
   map(keyOrValue) {
+    this._alignToNextByte();
     if (keyOrValue instanceof Map) {
       const map = keyOrValue;
       this.uint32(map.size);
@@ -745,6 +758,7 @@ class BinaryHandler {
   }
 
   set(keyOrValue) {
+    this._alignToNextByte();
     if (keyOrValue instanceof Set) {
       const set = keyOrValue;
       this.uint32(set.size);
@@ -767,6 +781,7 @@ class BinaryHandler {
   }
 
   pojo(keyOrValue) {
+    this._alignToNextByte();
     if (typeof keyOrValue === 'object' && keyOrValue !== null) {
       const obj = keyOrValue;
       const keys = Object.keys(obj);
@@ -793,6 +808,7 @@ class BinaryHandler {
   }
 
   buffer(keyOrBuffer, length = null) {
+    this._alignToNextByte();
     if (typeof keyOrBuffer === 'string') {
       const key = keyOrBuffer;
       this._validateLength(length);
