@@ -15,6 +15,15 @@ class BinaryHandler {
     this.fd = null;
   }
 
+  jump(cursor) {
+    if (this._buffer.length) {
+      this._writeBytes(this._buffer);
+      this._buffer = Buffer.alloc(0);
+    }
+    this.cursor = cursor;
+    this.bitCursor = 0;
+  }
+
   // Function to write bits into a buffer with bitOffset
   writeBits(length, value, buffer, bitOffset = 0) {
     if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
