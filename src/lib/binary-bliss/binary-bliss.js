@@ -394,12 +394,12 @@ class BinaryHandler {
     } else if (value instanceof Set) {
       this.uint8(BinaryType.SET); // Type flag for set
       this.set(value);
-    } else if (typeof value === 'object' && value !== null) {
-      this.uint8(BinaryType.POJO);
-      this.pojo(value);
     } else if (Buffer.isBuffer(value)) {
       this.uint8(BinaryType.BUFFER); // Type flag for buffer
       this.buffer(value);
+    } else if (typeof value === 'object' && value !== null) {
+      this.uint8(BinaryType.POJO);
+      this.pojo(value);
     } else if (typeof value === 'boolean') {
       this.uint8(BinaryType.BOOL); // Type flag for bool
       this.bool(value);
@@ -831,10 +831,11 @@ class BinaryHandler {
     }
   }
 
-  buffer(keyOrBuffer, length = null) {
+  buffer(keyOrBuffer) {
     if (typeof keyOrBuffer === 'string') {
       this._alignToNextRead();
       const key = keyOrBuffer;
+      const length = this.uint32('length').last.value;
       this._validateLength(length);
       this._ensureBytes(length);
       const buffer = this._readBytes(length);
@@ -844,6 +845,7 @@ class BinaryHandler {
       this._alignToNextWrite();
       const buffer = keyOrBuffer;
       this._validateBuffer(buffer);
+      this.uint32(buffer.length);
       this._writeBytes(buffer);
       return this;
     } else {

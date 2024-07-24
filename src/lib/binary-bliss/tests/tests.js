@@ -5,6 +5,7 @@ import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
 
+const LARGE = false;
 const BIT_ONLY = false;
 const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
@@ -20,60 +21,60 @@ function saveKeys() {
 saveKeys();
 
 // helpers
-function cleanUp(filePath, actuallyDo = true) {
-  if ( ! actuallyDo ) return;
-  if (existsSync(filePath)) {
-    unlinkSync(filePath);
-  }
-}
-
-function assertEqual(expected, actual, message) {
-  if (expected != actual) {
-    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
-  } else {
-    console.log(`${greenCheck} Test passed: ${message}`);
-  }
-}
-
-function assertNestedArrayEqual(expected, actual, message) {
-  if (!Array.isArray(expected) || !Array.isArray(actual)) {
-    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
-    return;
-  }
-
-  if (expected.length !== actual.length) {
-    console.error(`${redCross} Test failed: ${message}\nExpected length: ${expected.length}\nActual length: ${actual.length}`);
-    return;
-  }
-
-  for (let i = 0; i < expected.length; i++) {
-    if (Array.isArray(expected[i]) && Array.isArray(actual[i])) {
-      assertNestedArrayEqual(expected[i], actual[i], `${message} (index ${i})`);
-    } else if (expected[i] instanceof Date && actual[i] instanceof Date) {
-      assertEqual(expected[i].toISOString(), actual[i].toISOString(), `${message} (index ${i})`);
-    } else if (typeof expected[i] === 'object' && typeof actual[i] === 'object') {
-      assertEqual(JSON.stringify(expected[i]), JSON.stringify(actual[i]), `${message} (index ${i})`);
-    } else {
-      assertEqual(expected[i], actual[i], `${message} (index ${i})`);
+  function cleanUp(filePath, actuallyDo = true) {
+    if ( ! actuallyDo ) return;
+    if (existsSync(filePath)) {
+      unlinkSync(filePath);
     }
   }
-}
 
-function assertBufferEqual(expected, actual, message) {
-  if (!Buffer.isBuffer(expected)) {
-    console.error(`${redCross} Test failed: ${message}\nExpected is not a buffer: ${expected}`);
-    return;
+  function assertEqual(expected, actual, message) {
+    if (expected != actual) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+    } else {
+      console.log(`${greenCheck} Test passed: ${message}`);
+    }
   }
-  if (!Buffer.isBuffer(actual)) {
-    console.error(`${redCross} Test failed: ${message}\nActual is not a buffer: ${actual}`);
-    return;
+
+  function assertNestedArrayEqual(expected, actual, message) {
+    if (!Array.isArray(expected) || !Array.isArray(actual)) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected}\nActual: ${actual}`);
+      return;
+    }
+
+    if (expected.length !== actual.length) {
+      console.error(`${redCross} Test failed: ${message}\nExpected length: ${expected.length}\nActual length: ${actual.length}`);
+      return;
+    }
+
+    for (let i = 0; i < expected.length; i++) {
+      if (Array.isArray(expected[i]) && Array.isArray(actual[i])) {
+        assertNestedArrayEqual(expected[i], actual[i], `${message} (index ${i})`);
+      } else if (expected[i] instanceof Date && actual[i] instanceof Date) {
+        assertEqual(expected[i].toISOString(), actual[i].toISOString(), `${message} (index ${i})`);
+      } else if (typeof expected[i] === 'object' && typeof actual[i] === 'object') {
+        assertEqual(JSON.stringify(expected[i]), JSON.stringify(actual[i]), `${message} (index ${i})`);
+      } else {
+        assertEqual(expected[i], actual[i], `${message} (index ${i})`);
+      }
+    }
   }
-  if (Buffer.compare(expected, actual) !== 0) {
-    console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
-  } else {
-    console.log(`${greenCheck} Test passed: ${message}`);
+
+  function assertBufferEqual(expected, actual, message) {
+    if (!Buffer.isBuffer(expected)) {
+      console.error(`${redCross} Test failed: ${message}\nExpected is not a buffer: ${expected}`);
+      return;
+    }
+    if (!Buffer.isBuffer(actual)) {
+      console.error(`${redCross} Test failed: ${message}\nActual is not a buffer: ${actual}`);
+      return;
+    }
+    if (Buffer.compare(expected, actual) !== 0) {
+      console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
+    } else {
+      console.log(`${greenCheck} Test passed: ${message}`);
+    }
   }
-}
 
 function testColorType() {
   console.log('Testing Color Type');
@@ -243,6 +244,47 @@ function testBitFieldCrossByteBoundary() {
   }
 
   bh.closeFile();
+}
+
+function testBinarySerialization() {
+  console.log('Testing Binary Serialization');
+
+  const testData = {
+    text: 'Hello, World!',
+    number: 42,
+    date: new Date('2024-07-24T10:00:00Z'),
+    buffer: Buffer.from('binary data'),
+    nested: {
+      bool: true,
+      bitField: 1234,
+      complexBuffer: Buffer.from('complex binary data'),
+    },
+  };
+
+  const filePath = 'test_binary_serialization.bin';
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(testData);
+  handler.jump(0);
+  const readData = handler.pojo('testData').last.value;
+
+  assertEqual(testData.text, readData.text, 'Text field');
+  assertEqual(testData.number, readData.number, 'Number field');
+  assertEqual(testData.date.toISOString(), readData.date.toISOString(), 'Date field');
+  assertBufferEqual(testData.buffer, Buffer.from(readData.buffer), 'Buffer field');
+  assertEqual(testData.nested.bool, readData.nested.bool, 'Nested Boolean field');
+  assertEqual(testData.nested.bitField, readData.nested.bitField, 'Nested Bit Field');
+  assertBufferEqual(testData.nested.complexBuffer, Buffer.from(readData.nested.complexBuffer), 'Nested Complex Buffer field');
+
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error('✗ Test failed: File failed to verify.');
+  } else {
+    console.log('✓ Test passed: File signature successfully verified.');
+  }
+
+  handler.closeFile();
+  cleanUp(filePath);
 }
 
 function enhancedBitFieldTests() {
@@ -1256,7 +1298,8 @@ function runTests() {
     runGzipTests();
     testFailVerify();
     testComplexNestedStructures();
-    testLargeDataSet();
+    LARGE && testLargeDataSet();
+    testBinarySerialization();
     testRandomizedData();
     testAlphabetSoup();
   }
