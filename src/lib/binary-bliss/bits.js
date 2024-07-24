@@ -191,15 +191,6 @@ class BinaryHandler {
   $(searchKey) {
     return this.reading.findLast(item => item.key === searchKey) || null;
   }
-
-  jump(cursor) {
-    if (this._buffer.length) {
-      this._writeBytes(this._buffer);
-      this._buffer = Buffer.alloc(0);
-    }
-    this.cursor = cursor;
-    this.bitCursor = 0;
-  }
 }
 
 export { BinaryHandler }
