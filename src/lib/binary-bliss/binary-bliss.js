@@ -10,7 +10,6 @@ const ETEXT = true;
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 const DEBUG = false;
-const CURSOR = true;
 
 const BinaryType = {
   STRING: 1,
@@ -27,103 +26,101 @@ class BinaryHandler {
   constructor(endian = 'BE') {
     this.endian = endian;
     this._buffer = Buffer.alloc(0);
-    this._fileCursor = 0;
-    this._cursor = 0;
+    this.cursor = 0;
     this.bitCursor = 0;
     this.reading = [];
     this.fd = null;
   }
 
-  get cursor() {
-    return this._cursor;
-  }
-
-  set cursor(val) {
-    CURSOR && console.log(`Updating cursor from ${this._cursor} to ${val} at`, (new Error).stack);
-    this._cursor = val;
-  }
-
   _alignToNextByte() {
-    if (this.bitCursor % 8 !== 0) {
-      this.bitCursor += 8 - (this.bitCursor % 8);
-    }
-  }
-
-  _alignToNextWrite() {
-    const len = Math.ceil(this.bitCursor / 8);
-    if (this._buffer.length) {
-      this._writeBytes(this._buffer.slice(0, len));
+    if ( this._buffer.length ) {
+      this._writeBytes(this._buffer);
+      this.cursor += this._buffer.length;
       this._buffer = Buffer.alloc(0);
-    }
-    this.bitCursor = 0;
-  }
-
-  _alignToNextRead() {
-    const len = Math.floor(this.bitCursor / 8);
-    const { bitCursor, cursor } = this;
-    CURSOR && console.log({ bitCursor, cursor, len });
-    this.bitCursor = 0;
-    this._buffer = Buffer.alloc(0);
-  }
-
-  extendBuffer(size) {
-    const currentLength = this._buffer.length;
-    if (size > currentLength) {
-      const additionalBytes = size - currentLength;
-      const newBuffer = Buffer.alloc(additionalBytes);
-      readSync(this.fd, newBuffer, 0, additionalBytes, this._fileCursor);
-      this._buffer = Buffer.concat([this._buffer, newBuffer]);
+      this.bitCursor = 0;
     }
   }
 
-  readBits(length) {
-    let result = 0n;
+  // Function to write bits into a buffer with bitOffset
+  writeBits(length, value, buffer, bitOffset = 0) {
+    if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+      throw new Error('Length must be a positive integer');
+    }
+
+    value = BigInt(value);
+    DEBUG && console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2)}, bitOffset: ${bitOffset}`);
+
+    const byteAddr = i => Math.floor((i + bitOffset) / 8);
+    const bitAddr = i => (i + bitOffset) % 8;
+
     for (let i = 0; i < length; i++) {
-      const bitIndex = this.bitCursor + i;
-      const byteIndex = Math.floor(bitIndex / 8);
-      const bitPosition = 7 - (bitIndex % 8);
+      const mask = 1n << BigInt(i);
+      const iBit = (value & mask) >> BigInt(i);
+      const byteIndex = byteAddr(i);
+      const bitIndex = bitAddr(i);
 
-      if (byteIndex >= this._buffer.length) {
-        this.extendBuffer(byteIndex + 1);
+      if (bitIndex === 0) {
+        buffer[byteIndex] = 0; // Clear the byte before setting bits
       }
-
-      const bit = (this._buffer[byteIndex] >> bitPosition) & 1;
-      result = (result << 1n) | BigInt(bit);
+      
+      buffer[byteIndex] |= Number(iBit) << bitIndex;
     }
-    this.bitCursor += length;
-    return result;
+
+    return { buffer, bitOffset: (bitOffset + length) % 8 };
   }
 
-  writeBits(length, value) {
-    for (let i = 0; i < length; i++) {
-      const bitIndex = this.bitCursor + i;
-      const byteIndex = Math.floor(bitIndex / 8);
-      const bitPosition = 7 - (bitIndex % 8);
-
-      if (byteIndex >= this._buffer.length) {
-        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(byteIndex - this._buffer.length + 1)]);
-      }
-
-      const bit = (value >> BigInt(length - 1 - i)) & 1n;
-      this._buffer[byteIndex] |= Number(bit) << bitPosition;
+  // Function to read bits from a buffer with bitOffset
+  readBits(length, buffer, bitOffset = 0) {
+    if (typeof length !== 'number' || length <= 0 || !Number.isInteger(length)) {
+      throw new Error('Length must be a positive integer');
     }
-    this.bitCursor += length;
+
+    let value = BigInt(0);
+    DEBUG && console.log(`\nReading bits for length: ${length}, bitOffset: ${bitOffset}`);
+
+    const byteAddr = i => Math.floor((i + bitOffset) / 8);
+    const bitAddr = i => (i + bitOffset) % 8;
+
+    for (let i = 0; i < length; i++) {
+      const byteIndex = byteAddr(i);
+      const bitIndex = bitAddr(i);
+
+      const bit = (buffer[byteIndex] >> bitIndex) & 1;
+      value |= BigInt(bit) << BigInt(i);
+    }
+
+    return { value, bitOffset: (bitOffset + length) % 8 };
   }
 
   bit(length, keyOrValue) {
+    const byteLength = Math.ceil((this.bitCursor + length) / 8);
     if (typeof keyOrValue === 'string') {
-      return this.readBits(length);
+      // Read mode
+      if (byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
+      }
+
+      const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
+      this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
+      this.bitCursor = bitOffset;
+      return this;
     } else {
-      this.writeBits(length, BigInt(keyOrValue));
+      // Write mode
+      const value = BigInt(keyOrValue);
+      if (byteLength > this._buffer.length) {
+        this._buffer = Buffer.concat([this._buffer, Buffer.alloc(byteLength - this._buffer.length)]);
+      }
+      const { buffer, bitOffset } = this.writeBits(length, value, this._buffer, this.bitCursor);
+      this.bitCursor = bitOffset;
+      this._buffer = buffer;
+
+      return this;
     }
   }
 
-  uint32(keyOrValue) {
-    if (typeof keyOrValue === 'string') {
-      return Number(this.readBits(32));
-    } else {
-      this.writeBits(32, BigInt(keyOrValue));
-    }
+  setEndian(endian) {
+    this.endian = endian;
+    return this;
   }
 
   openFile(filePath) {
@@ -140,7 +137,7 @@ class BinaryHandler {
   }
 
   closeFile() {
-    if (this._buffer.length) {
+    if ( this._buffer.length ) {
       this._writeBytes(this._buffer);
       this._buffer = Buffer.alloc(0);
     }
@@ -152,31 +149,49 @@ class BinaryHandler {
   }
 
   signFile(privateKeyPath) {
-    if (!existsSync(privateKeyPath) || !existsSync(this.filePath)) {
+    // Read the private key
+    if ( ! existsSync(privateKeyPath) || ! existsSync(this.filePath) ) {
       throw new Error(`Both private key (${privateKeyPath}) and file (${this.filePath}) must exist.`);
     }
     const privateKey = Buffer.from(readFileSync(privateKeyPath, 'utf8'), 'hex');
+
+    // Read the file content excluding the signature (assume last 64 bytes for the signature)
     const fileContent = readFileSync(this.filePath);
     const contentToSign = fileContent;
+
+    // Create the signature
     const signature = sign(contentToSign, privateKey);
+
+    // Append the signature to the file
     appendFileSync(this.filePath, Buffer.from(signature));
   }
 
   verifyFile(publicKeyPath) {
-    if (!existsSync(publicKeyPath) || !existsSync(this.filePath)) {
+    // Read the public key
+    if ( ! existsSync(publicKeyPath) || ! existsSync(this.filePath) ) {
       throw new Error(`Both public key (${publicKeyPath}) and file (${this.filePath}) must exist.`);
     }
     const publicKey = Buffer.from(readFileSync(publicKeyPath, 'utf8'), 'hex');
+
+    // Read the file content excluding the signature (assume last 64 bytes for the signature)
     const fileContent = readFileSync(this.filePath);
     const contentToVerify = fileContent.slice(0, fileContent.length - 64);
     const signature = fileContent.slice(fileContent.length - 64);
+
+    // Verify the signature
     const isValid = verify(signature, contentToVerify, publicKey);
+
     return isValid;
+  }
+
+  _seek(offset) {
+    this.cursor = offset;
+    this.bitCursor = 0;
   }
 
   _validateLength(length) {
     if (typeof length !== 'number' || length <= 0 || length > MAX_BUFFER_SIZE) {
-      console.error({ length });
+      console.error({length});
       throw new Error('Invalid length');
     }
   }
@@ -192,8 +207,7 @@ class BinaryHandler {
       throw new Error('File is not open');
     }
     const stats = fstatSync(this.fd);
-    if ((this._fileCursor + length) > stats.size) {
-      console.error({ fileCursor: this._fileCursor, length, size: stats.size });
+    if (this.cursor + length > stats.size) {
       throw new Error('Insufficient data in file');
     }
   }
@@ -202,20 +216,16 @@ class BinaryHandler {
     try {
       this._validateLength(length);
       const stats = fstatSync(this.fd);
-      if (this._fileCursor + length > stats.size) {
-        console.error({ fileCursor: this._fileCursor, length, size: stats.size });
+      if (this.cursor + length > stats.size) {
         throw new Error('Insufficient data in file');
       }
 
       const buffer = Buffer.alloc(length);
-      readSync(this.fd, buffer, 0, length, this._fileCursor);
+      readSync(this.fd, buffer, 0, length, this.cursor);
       if (opts.decode && ETEXT) {
         BinaryUtils.decode(buffer);
       }
-      this._fileCursor += length;
-      if (this.bitCursor) {
-        this.bitCursor = Math.max(0, this.bitCursor - length * 8);
-      }
+      this.cursor += length;
       return buffer;
     } catch (error) {
       console.error('Error reading bytes:', error);
@@ -224,14 +234,14 @@ class BinaryHandler {
   }
 
   _writeBytes(buffer, opts = {}) {
-    if (!buffer.length) return;
+    if ( ! buffer.length ) return;
     try {
       this._validateBuffer(buffer);
       if (opts.encode && ETEXT) {
         BinaryUtils.encode(buffer);
       }
-      writeSync(this.fd, buffer, 0, buffer.length, this._fileCursor);
-      this._fileCursor += buffer.length;
+      writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
+      this.cursor += buffer.length;
     } catch (error) {
       console.error('Error writing bytes:', error);
       throw error;
@@ -249,6 +259,7 @@ class BinaryHandler {
   gzip(options) {
     this._alignToNextByte();
     if (typeof options === 'string') {
+      // Reading and decompressing
       const key = options;
       this._ensureBytes(1); // Read type
       const type = this._readBytes(1).readUInt8(0);
@@ -268,6 +279,7 @@ class BinaryHandler {
       }
       this.reading.push({ key, value, type: 'gzip' });
     } else {
+      // Writing and compressing
       const { data } = options;
       let encodedData, type;
       if (typeof data === 'string') {
@@ -410,15 +422,13 @@ class BinaryHandler {
 
   uint16(keyOrValue) {
     if (typeof keyOrValue === 'string') {
-      this._alignToNextRead();
       this._ensureBytes(2);
       const buffer = this._readBytes(2);
       const value = this.endian === 'BE' ? buffer.readUInt16BE(0) : buffer.readUInt16LE(0);
       this.reading.push({ key: keyOrValue, value, type: 'uint16' });
       return this;
     } else {
-      this._alignToNextWrite();
-      DEBUG && console.log(`Writing uint16 value for 2 bytes`);
+      this._alignToNextByte();
       const value = keyOrValue;
       const buffer = Buffer.alloc(2);
       if (this.endian === 'BE') {
@@ -454,15 +464,13 @@ class BinaryHandler {
 
   uint32(keyOrValue) {
     if (typeof keyOrValue === 'string') {
-      this._alignToNextRead();
       this._ensureBytes(4);
       const buffer = this._readBytes(4);
       const value = this.endian === 'BE' ? buffer.readUInt32BE(0) : buffer.readUInt32LE(0);
       this.reading.push({ key: keyOrValue, value, type: 'uint32' });
       return this;
     } else {
-      this._alignToNextWrite();
-      DEBUG && console.log(`Writing uint32 value for 4 bytes`);
+      this._alignToNextByte();
       const value = keyOrValue;
       const buffer = Buffer.alloc(4);
       if (this.endian === 'BE') {
@@ -535,12 +543,11 @@ class BinaryHandler {
   }
 
   jump(cursorPosition) {
-    if (this._buffer.length) {
+    if ( this._buffer.length ) {
       this._writeBytes(this._buffer);
       this._buffer = Buffer.alloc(0);
-      console.log(`Buffer at jump to ${cursorPosition} has length ${this._buffer.length}`);
     }
-    this._fileCursor = cursorPosition;
+    this.cursor = cursorPosition;
     this.bitCursor = 0;
     return this;
   }
@@ -551,20 +558,23 @@ class BinaryHandler {
 
     const encodedValue = ATextEncoder.encode(value);
     if (len === null) {
+      // Non-fixed length string with metadata
       buffer = Buffer.from(encodedValue, encoding);
       const metaLength = Buffer.alloc(4);
       metaLength.writeUInt32BE(buffer.length, 0);
-      const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8');
-      const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0');
+      const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
+      const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); // Fixed length for delimiter
       if (ETEXT) {
         BinaryUtils.encode(metaEncoding);
         BinaryUtils.encode(buffer);
       }
       this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
     } else {
-      this._validateLength(len);
+      // Fixed length string
+      this._validateLength(len); // Validate the length
       buffer = Buffer.alloc(len);
       buffer.write(value, 0, len, encoding);
+      console.log('encode', buffer);
       this._writeBytes(buffer, { encode: true });
     }
     return this;
@@ -574,18 +584,19 @@ class BinaryHandler {
     this._alignToNextByte();
     const key = keyOrValue;
     if (len !== null) {
-      this._validateLength(len);
+      this._validateLength(len); // Validate the length
       this._ensureBytes(len);
       let value = this._readBytes(len, { decode: true }).toString(encoding);
       value = ATextDecoder.decode(value.buffer.slice(0, value.length));
       this.reading.push({ key, value, type: 'string' });
     } else {
-      this._ensureBytes(4);
+      // Read metadata
+      this._ensureBytes(4); // Read length
       const strLength = this._readBytes(4).readUInt32BE(0);
-      this._validateLength(strLength);
-      this._ensureBytes(5);
+      this._validateLength(strLength); // Validate the length
+      this._ensureBytes(5); // Read encoding
       const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
-      this._ensureBytes(5);
+      this._ensureBytes(5); // Read delimiter
       const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
       this._ensureBytes(strLength);
       let value = this._readBytes(strLength, { decode: true });
@@ -597,7 +608,7 @@ class BinaryHandler {
 
   array(keyOrValue, length, type, delimiter = null) {
     this._alignToNextByte();
-    this._validateLength(length);
+    this._validateLength(length); // Validate the length
     if (Array.isArray(keyOrValue)) {
       const values = keyOrValue;
       for (let i = 0; i < values.length; i++) {
@@ -673,28 +684,28 @@ class BinaryHandler {
 
   _writeTypeAndValue(value) {
     if (typeof value === 'string') {
-      this.uint8(BinaryType.STRING);
+      this.uint8(BinaryType.STRING); // Type flag for string
       this.puts(value);
     } else if (typeof value === 'number') {
-      this.uint8(BinaryType.FLOAT);
+      this.uint8(BinaryType.FLOAT); // Type flag for float
       this.float(value);
     } else if (value instanceof Date) {
-      this.uint8(BinaryType.DATE);
+      this.uint8(BinaryType.DATE); // Type flag for date
       this.date(value);
     } else if (Array.isArray(value)) {
-      this.uint8(BinaryType.HETERO_ARRAY);
+      this.uint8(BinaryType.HETERO_ARRAY); // Type flag for heteroArray
       this.heteroArray(value);
     } else if (value instanceof Map) {
-      this.uint8(BinaryType.MAP);
+      this.uint8(BinaryType.MAP); // Type flag for map
       this.map(value);
     } else if (value instanceof Set) {
-      this.uint8(BinaryType.SET);
+      this.uint8(BinaryType.SET); // Type flag for set
       this.set(value);
     } else if (typeof value === 'object' && value !== null) {
       this.uint8(BinaryType.POJO);
       this.pojo(value);
     } else if (Buffer.isBuffer(value)) {
-      this.uint8(BinaryType.BUFFER);
+      this.uint8(BinaryType.BUFFER); // Type flag for buffer
       this.buffer(value);
     } else {
       console.error(`Unsupported value`, value);
@@ -897,9 +908,9 @@ class BinaryHandler {
         const method = match[1];
         const args = match[2].split(',').map(arg => arg.trim().replace(/['"]/g, ''));
         if (typeof this[method] === 'function') {
-          const beforeCursor = this._fileCursor;
+          const beforeCursor = this.cursor;
           this[method](...args);
-          const afterCursor = this._fileCursor;
+          const afterCursor = this.cursor;
           const buffer = this._readBytes(afterCursor - beforeCursor);
           const hexData = buffer.toString('hex').match(/.{1,2}/g).join(' ');
           result.push(`${hexData}\t${method}(${args.join(', ')}): ${JSON.stringify(this.last.value)}`);
@@ -992,6 +1003,28 @@ const BinaryUtils = {
 
     return buffer;
   }
+
+  /*
+  encode(buf) {
+    if ( buf.length == 0 ) return buf;
+
+    for( let i = 0; i < buf.length; i++ ) {
+      buf[i] ^= 123;
+    }
+
+    return buf;
+  },
+
+  decode(buf) {
+    if ( buf.length == 0 ) return buf;
+
+    for( let i = 0; i < buf.length; i++ ) {
+      buf[i] ^= 123;
+    }
+
+    return buf;
+  }
+  */
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils, BinaryType };
