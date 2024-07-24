@@ -5,7 +5,7 @@ import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
 
-const BIT_ONLY = true;
+const BIT_ONLY = false;
 const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
 
@@ -134,7 +134,6 @@ function testInterleavedBitFields() {
   bh.uint32('bit32 2');
 
   const result = bh.read();
-  console.log(result);
 
   assertEqual(5, result.bit3.value, 'Interleaved Bit3 value');
   assertEqual(1024, result.uint32.value, 'Interleaved Uint32 value');

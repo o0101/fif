@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 import path from 'path';
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
-const DEBUG = true;
+const DEBUG = false;
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -13,14 +13,13 @@ class BinaryHandler {
     this.bitCursor = 0;
     this.reading = [];
     this.fd = null;
-    this.bitRemainder = 0; // Remainder bits from previous reads
-    this.bitRemainderLength = 0; // Number of remainder bits
   }
 
   jump(cursorPosition) {
     DEBUG && console.log(`Jumping to cursor position: ${cursorPosition}`);
     if (this._buffer.length) {
       this._writeBytes(this._buffer);
+      DEBUG && console.log(`Wrote ${this._buffer.length} bytes at jump to ${cursorPosition}.`);
       this._buffer = Buffer.alloc(0);
     }
     this.cursor = cursorPosition;
@@ -92,35 +91,15 @@ class BinaryHandler {
         this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
       }
 
-      // Combine remainder bits with new bits if necessary
-      if (this.bitRemainderLength > 0) {
-        const totalBits = this.bitRemainderLength + length;
-        const remainderShift = BigInt(this.bitRemainder) << BigInt(length);
-        const { value: newBits, bitOffset } = this.readBits(totalBits, this._buffer, this.bitCursor);
-        const combinedValue = remainderShift | newBits;
-        this.bitRemainder = 0;
-        this.bitRemainderLength = 0;
-
-        // Handle any unused bits from combined value
-        const unusedBits = totalBits - length;
-        const finalValue = combinedValue >> BigInt(unusedBits);
-        const newRemainder = combinedValue & ((1n << BigInt(unusedBits)) - 1n);
-
-        this.reading.push({ key: keyOrValue, value: finalValue, type: `bit_${length}` });
-        this.bitCursor = bitOffset;
-
-        if (unusedBits > 0) {
-          this.bitRemainder = Number(newRemainder);
-          this.bitRemainderLength = unusedBits;
-        }
-
-        DEBUG && console.log(`Combined read: finalValue=${finalValue.toString(2)}, newRemainder=${newRemainder.toString(2)}, bitCursor=${this.bitCursor}`);
+      const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
+      this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
+      this.bitCursor = bitOffset;
+      if ( bitOffset == 0 ) {
+        this._buffer = Buffer.alloc(0);
       } else {
-        const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
-        this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
-        this.bitCursor = bitOffset;
-        DEBUG && console.log(`Direct read: value=${value.toString(2)}, bitCursor=${this.bitCursor}`);
+        this._buffer = this._buffer.slice(-1);
       }
+      DEBUG && console.log(`Direct read: value=${value.toString(2)}, bitCursor=${this.bitCursor}`);
 
       return this;
     } else {
@@ -131,7 +110,17 @@ class BinaryHandler {
       }
       const { buffer, bitOffset } = this.writeBits(length, value, this._buffer, this.bitCursor);
       this.bitCursor = bitOffset;
-      this._buffer = buffer;
+      if ( bitOffset == 0 ) {
+        // all bits used, carry forward nothing
+        this._writeBytes(buffer);
+        DEBUG && console.log(`Wrote ${buffer.length} bytes`);
+        this._buffer = Buffer.alloc(0);
+      } else {
+        // carry forward the partial unused bits
+        this._buffer = buffer.slice(-1);
+        DEBUG && console.log(`Carried 1 bytes and wrote ${buffer.length-1} bytes`);
+        this._writeBytes(buffer.slice(0,-1));
+      }
 
       DEBUG && console.log(`Write operation: buffer=${buffer.toString('hex')}, bitCursor=${this.bitCursor}`);
       return this;
@@ -221,7 +210,7 @@ class BinaryHandler {
       writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
       this.cursor += buffer.length;
 
-      DEBUG && console.log(`Wrote bytes: length=${buffer.length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
+      DEBUG && console.log(`Wrote bytes (${this.filePath}): length=${buffer.length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
     } catch (error) {
       console.error('Error writing bytes:', error);
       throw error;
