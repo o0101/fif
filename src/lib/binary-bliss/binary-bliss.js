@@ -20,6 +20,7 @@ const BinaryType = {
   MAP: 6,
   SET: 7,
   BUFFER: 8,
+  BOOL: 9,
 };
 
 class BinaryHandler {
@@ -148,6 +149,19 @@ class BinaryHandler {
 
       DEBUG && console.log(`Write operation: buffer=${buffer.toString('hex')}, bitCursor=${this.bitCursor}`);
       return this;
+    }
+  }
+
+  bool(keyOrValue) {
+    if (typeof keyOrValue === 'string') {
+      // Read mode
+      const buy = this.bit(1, keyOrValue).last;
+      buy.value = buy.value ? true : false;
+      buy.type = 'bool';
+      return this;
+    } else {
+      // Write mode
+      return this.bit(1, keyOrValue ? 1 : 0);
     }
   }
 
@@ -361,11 +375,12 @@ class BinaryHandler {
   }
 
   _writeTypeAndValue(value) {
+    this._alignToNextWrite();
     if (typeof value === 'string') {
       this.uint8(BinaryType.STRING); // Type flag for string
       this.puts(value);
     } else if (typeof value === 'number') {
-      this.uint8(BinaryType.FLOAT); // Type flag for float (use 2 for consistency)
+      this.uint8(BinaryType.FLOAT); // Type flag for float
       this.float(value);
     } else if (value instanceof Date) {
       this.uint8(BinaryType.DATE); // Type flag for date
@@ -379,15 +394,23 @@ class BinaryHandler {
     } else if (value instanceof Set) {
       this.uint8(BinaryType.SET); // Type flag for set
       this.set(value);
+    } else if (typeof value === 'object' && value !== null) {
+      this.uint8(BinaryType.POJO);
+      this.pojo(value);
     } else if (Buffer.isBuffer(value)) {
       this.uint8(BinaryType.BUFFER); // Type flag for buffer
       this.buffer(value);
+    } else if (typeof value === 'boolean') {
+      this.uint8(BinaryType.BOOL); // Type flag for bool
+      this.bool(value);
     } else {
+      console.error(`Unsupported value`, value);
       throw new Error('Unsupported type for _writeTypeAndValue');
     }
   }
 
   _readTypeAndValue(uniq = 'value') {
+    this._alignToNextRead();
     const type = this.uint8('type').last.value;
     let value;
     switch (type) {
@@ -417,6 +440,9 @@ class BinaryHandler {
         break;
       case BinaryType.BUFFER:
         value = this.buffer(uniq).last.value;
+        break;
+      case BinaryType.BOOL:
+        value = this.bool(uniq).last.value;
         break;
       default:
         throw new Error('Unknown type in _readTypeAndValue');
@@ -753,82 +779,12 @@ class BinaryHandler {
     }
   }
 
-  _writeTypeAndValue(value) {
-    this._alignToNextWrite();
-    if (typeof value === 'string') {
-      this.uint8(BinaryType.STRING); // Type flag for string
-      this.puts(value);
-    } else if (typeof value === 'number') {
-      this.uint8(BinaryType.FLOAT); // Type flag for float
-      this.float(value);
-    } else if (value instanceof Date) {
-      this.uint8(BinaryType.DATE); // Type flag for date
-      this.date(value);
-    } else if (Array.isArray(value)) {
-      this.uint8(BinaryType.HETERO_ARRAY); // Type flag for heteroArray
-      this.heteroArray(value);
-    } else if (value instanceof Map) {
-      this.uint8(BinaryType.MAP); // Type flag for map
-      this.map(value);
-    } else if (value instanceof Set) {
-      this.uint8(BinaryType.SET); // Type flag for set
-      this.set(value);
-    } else if (typeof value === 'object' && value !== null) {
-      this.uint8(BinaryType.POJO);
-      this.pojo(value);
-    } else if (Buffer.isBuffer(value)) {
-      this.uint8(BinaryType.BUFFER); // Type flag for buffer
-      this.buffer(value);
-    } else {
-      console.error(`Unsupported value`, value);
-      throw new Error('Unsupported type for _writeTypeAndValue');
-    }
-  }
-
-  _readTypeAndValue(uniq = 'value') {
-    this._alignToNextRead();
-    const type = this.uint8('type').last.value;
-    let value;
-    switch (type) {
-      case BinaryType.STRING:
-        value = this.gets(uniq).last.value;
-        break;
-      case BinaryType.FLOAT:
-        value = this.float(uniq).last.value;
-        break;
-      case BinaryType.DATE:
-        value = this.date(uniq).last.value;
-        break;
-      case BinaryType.HETERO_ARRAY:
-        value = this.heteroArray(uniq).last.value;
-        break;
-      case BinaryType.POJO:
-        this.pojo(uniq);
-        value = this.$(uniq).value;
-        break;
-      case BinaryType.MAP:
-        this.map(uniq);
-        value = this.$(uniq).value;
-        break;
-      case BinaryType.SET:
-        this.set(uniq);
-        value = this.$(uniq).value;
-        break;
-      case BinaryType.BUFFER:
-        value = this.buffer(uniq).last.value;
-        break;
-      default:
-        throw new Error('Unknown type in _readTypeAndValue');
-    }
-    return value;
-  }
-
   set(keyOrValue) {
     if (keyOrValue instanceof Set) {
       this._alignToNextWrite();
       const set = keyOrValue;
       this.uint32(set.size);
-      for (const value of set) {
+      for (const value of set.values()) {
         this._writeTypeAndValue(value);
       }
       return this;
@@ -882,7 +838,7 @@ class BinaryHandler {
       this._validateLength(length);
       this._ensureBytes(length);
       const buffer = this._readBytes(length);
-      this.reading.push({ key, value: buffer, type: 'buffer' });
+      this.reading.push({ key, value: Buffer.from(buffer), type: 'buffer' });
       return this;
     } else if (Buffer.isBuffer(keyOrBuffer)) {
       this._alignToNextWrite();

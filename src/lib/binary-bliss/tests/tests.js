@@ -60,6 +60,14 @@ function assertNestedArrayEqual(expected, actual, message) {
 }
 
 function assertBufferEqual(expected, actual, message) {
+  if (!Buffer.isBuffer(expected)) {
+    console.error(`${redCross} Test failed: ${message}\nExpected is not a buffer: ${expected}`);
+    return;
+  }
+  if (!Buffer.isBuffer(actual)) {
+    console.error(`${redCross} Test failed: ${message}\nActual is not a buffer: ${actual}`);
+    return;
+  }
   if (Buffer.compare(expected, actual) !== 0) {
     console.error(`${redCross} Test failed: ${message}\nExpected: ${expected.toString('hex')}\nActual: ${actual.toString('hex')}`);
   } else {
@@ -417,6 +425,101 @@ function testNestedArray() {
     console.log(`${greenCheck} File verification successful.`);
   } else {
     console.error(`${redCross} File verification failed.`);
+  }
+
+  handler.closeFile();
+}
+
+function testAlphabetSoup() {
+  console.log('Testing Alphabet Soup of Bit Operations and Data Types');
+
+  const filePath = path.join(process.cwd(), 'alphabetSoup.bin');
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+
+  // Writing a mix of bit operations and various data types
+  handler.bit(4, 15);  // Write 4 bits (1111)
+  handler.uint32(123456789); // Write a 32-bit integer
+  handler.bit(3, 5);   // Write 3 bits (101)
+  handler.float(123.456); // Write a float
+  handler.bit(5, 19);  // Write 5 bits (10011)
+  handler.gzip({ data: 'compressed string data' }); // Write gzipped string
+  handler.bit(7, 127); // Write 7 bits (1111111)
+  handler.uint16(65535); // Write a 16-bit integer
+  handler.bit(8, 255);  // Write 8 bits (11111111)
+  handler.pojo({ key: 'value', nested: { num: 42, bool: true } }); // Write a POJO
+  handler.bit(1, 1);   // Write 1 bit (1)
+  handler.buffer(Buffer.from('binary data')); // Write a buffer
+  handler.bit(10, 1023); // Write 10 bits (1111111111)
+  handler.date(new Date('2024-07-24T10:00:00Z')); // Write a date
+  handler.bit(12, 4095); // Write 12 bits (111111111111)
+  handler.heteroArray(['string', 789, new Date()]); // Write a hetero array
+  handler.bit(15, 32767); // Write 15 bits (111111111111111)
+  handler.uint8(255); // Write an 8-bit integer
+  handler.bool(true); // Write a boolean value
+  handler.bool(false); // Write another boolean value
+  handler.bit(200, 123456789123456789n); // Write 200 bits of a large value
+
+  // Reset buffer for reading
+  handler.jump(0);
+
+  // Reading the mixed bit operations and various data types
+  handler.bit(4, 'bit4');
+  handler.uint32('uint32');
+  handler.bit(3, 'bit3');
+  handler.float('float');
+  handler.bit(5, 'bit5');
+  handler.gzip('gzipString');
+  handler.bit(7, 'bit7');
+  handler.uint16('uint16');
+  handler.bit(8, 'bit8');
+  handler.pojo('pojo');
+  handler.bit(1, 'bit1');
+  handler.buffer('buffer', Buffer.from('binary data').length);
+  handler.bit(10, 'bit10');
+  handler.date('date');
+  handler.bit(12, 'bit12');
+  handler.heteroArray('heteroArray');
+  handler.bit(15, 'bit15');
+  handler.uint8('uint8');
+  handler.bool('bool1');
+  handler.bool('bool2');
+  handler.bit(200, 'bit200');
+
+  const result = handler.read();
+
+  // Validating the read data
+  assertEqual(15, result.bit4.value, 'Alphabet Soup Bit4');
+  assertEqual(123456789, result.uint32.value, 'Alphabet Soup Uint32');
+  assertEqual(5, result.bit3.value, 'Alphabet Soup Bit3');
+  assertEqual(123.456.toFixed(3), result.float.value.toFixed(3), 'Alphabet Soup Float');
+  assertEqual(19, result.bit5.value, 'Alphabet Soup Bit5');
+  assertEqual('compressed string data', result.gzipString.value, 'Alphabet Soup Gzip String');
+  assertEqual(127, result.bit7.value, 'Alphabet Soup Bit7');
+  assertEqual(65535, result.uint16.value, 'Alphabet Soup Uint16');
+  assertEqual(255, result.bit8.value, 'Alphabet Soup Bit8');
+  assertEqual('value', result.pojo.value.key, 'Alphabet Soup POJO key');
+  assertEqual(42, result.pojo.value.nested.num, 'Alphabet Soup POJO nested num');
+  assertEqual(true, result.pojo.value.nested.bool, 'Alphabet Soup POJO nested bool');
+  assertEqual(1, result.bit1.value, 'Alphabet Soup Bit1');
+  assertBufferEqual(Buffer.from('binary data'), result.buffer.value, 'Alphabet Soup Buffer');
+  assertEqual(1023, result.bit10.value, 'Alphabet Soup Bit10');
+  assertEqual(new Date('2024-07-24T10:00:00Z').toISOString(), result.date.value.toISOString(), 'Alphabet Soup Date');
+  assertEqual(4095, result.bit12.value, 'Alphabet Soup Bit12');
+  assertEqual('string', result.heteroArray.value[0], 'Alphabet Soup HeteroArray string');
+  assertEqual(789, result.heteroArray.value[1], 'Alphabet Soup HeteroArray number');
+  assertEqual(new Date().toISOString(), result.heteroArray.value[2].toISOString(), 'Alphabet Soup HeteroArray date');
+  assertEqual(32767, result.bit15.value, 'Alphabet Soup Bit15');
+  assertEqual(255, result.uint8.value, 'Alphabet Soup Uint8');
+  assertEqual(true, result.bool1.value, 'Alphabet Soup Bool1');
+  assertEqual(false, result.bool2.value, 'Alphabet Soup Bool2');
+  assertEqual(123456789123456789n, result.bit200.value, 'Alphabet Soup Bit200');
+
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
   }
 
   handler.closeFile();
@@ -954,6 +1057,167 @@ function testFailVerify() {
   handler.closeFile();
 }
 
+function testRandomizedData() {
+  console.log('Testing Randomized Data');
+
+  function getRandomInt(max) {
+    return Math.floor(Math.random() * max);
+  }
+
+  function getRandomString(length) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(getRandomInt(chars.length));
+    }
+    return result;
+  }
+
+  const randomData = {
+    randomString: getRandomString(1000),
+    randomNumber: getRandomInt(1000000),
+    randomArray: Array.from({ length: 100 }, () => getRandomInt(1000)),
+    randomBuffer: Buffer.alloc(100, getRandomInt(256)),
+    nested: {
+      nestedString: getRandomString(500),
+      nestedNumber: getRandomInt(100000),
+      nestedDate: new Date()
+    }
+  };
+  const filePath = path.join(process.cwd(), 'randomizedData.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(randomData);
+  handler.jump(0);
+  const readRandomData = handler.pojo('randomData').last.value;
+
+  assertEqual(randomData.randomString, readRandomData.randomString, 'Random Data randomString');
+  assertEqual(randomData.randomNumber, readRandomData.randomNumber, 'Random Data randomNumber');
+  assertNestedArrayEqual(randomData.randomArray, readRandomData.randomArray, 'Random Data randomArray');
+  assertBufferEqual(randomData.randomBuffer, readRandomData.randomBuffer, 'Random Data randomBuffer');
+  assertEqual(randomData.nested.nestedString, readRandomData.nested.nestedString, 'Random Data nestedString');
+  assertEqual(randomData.nested.nestedNumber, readRandomData.nested.nestedNumber, 'Random Data nestedNumber');
+  assertEqual(randomData.nested.nestedDate.toISOString(), readRandomData.nested.nestedDate.toISOString(), 'Random Data nestedDate');
+
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+}
+
+function testLargeDataSet() {
+  console.log('Testing Large Data Set');
+
+  const largeData = {
+    largeString: 'A'.repeat(1000000), // 1 million 'A' characters
+    largeArray: Array.from({ length: 10000 }, (_, i) => i), // Array with 10,000 integers
+    largeBuffer: Buffer.alloc(1000000, 'B'), // Buffer with 1 million 'B' characters
+    nested: {
+      nestedString: 'C'.repeat(500000),
+      nestedBuffer: Buffer.alloc(500000, 'D')
+    }
+  };
+  const filePath = path.join(process.cwd(), 'largeDataSet.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(largeData);
+  handler.jump(0);
+  const readLargeData = handler.pojo('largeData').last.value;
+
+  assertEqual(largeData.largeString, readLargeData.largeString, 'Large Data largeString');
+  assertNestedArrayEqual(largeData.largeArray, readLargeData.largeArray, 'Large Data largeArray');
+  assertBufferEqual(largeData.largeBuffer, readLargeData.largeBuffer, 'Large Data largeBuffer');
+  assertEqual(largeData.nested.nestedString, readLargeData.nested.nestedString, 'Large Data nestedString');
+  assertBufferEqual(largeData.nested.nestedBuffer, readLargeData.nested.nestedBuffer, 'Large Data nestedBuffer');
+
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+}
+
+function testComplexNestedStructures() {
+  console.log('Testing Complex Nested Structures');
+
+  const complexNested = {
+    level1: {
+      string: 'hello',
+      number: 12345,
+      date: new Date(),
+      nestedArray: [1, 'two', { three: 3 }],
+      nestedPojo: {
+        key: 'value',
+        array: [4, 5, 6],
+        nestedSet: new Set([7, 8, 9])
+      }
+    },
+    level2: new Map([
+      ['first', 'value1'],
+      ['second', { key: 'value2', nestedDate: new Date() }]
+    ]),
+    level3: new Set([
+      { key: 'value3', nestedBuffer: Buffer.from('nested buffer') },
+      'simpleString',
+      new Date()
+    ])
+  };
+  const filePath = path.join(process.cwd(), 'complexNestedStructures.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+  handler.pojo(complexNested);
+  handler.jump(0);
+  const readComplexNested = handler.pojo('complexNested').last.value;
+
+  assertEqual(complexNested.level1.string, readComplexNested.level1.string, 'Complex Nested string');
+  assertEqual(complexNested.level1.number, readComplexNested.level1.number, 'Complex Nested number');
+  assertEqual(complexNested.level1.date.toISOString(), readComplexNested.level1.date.toISOString(), 'Complex Nested date');
+  assertNestedArrayEqual(complexNested.level1.nestedArray, readComplexNested.level1.nestedArray, 'Complex Nested nestedArray');
+  assertEqual(complexNested.level1.nestedPojo.key, readComplexNested.level1.nestedPojo.key, 'Complex Nested nestedPojo key');
+  assertNestedArrayEqual(complexNested.level1.nestedPojo.array, readComplexNested.level1.nestedPojo.array, 'Complex Nested nestedPojo array');
+  assertEqual(complexNested.level1.nestedPojo.nestedSet.size, readComplexNested.level1.nestedPojo.nestedSet.size, 'Complex Nested nestedPojo nestedSet size');
+
+  assertEqual(complexNested.level2.size, readComplexNested.level2.size, 'Complex Nested Map size');
+  assertEqual(complexNested.level2.get('first'), readComplexNested.level2.get('first'), 'Complex Nested Map first value');
+  assertEqual(complexNested.level2.get('second').key, readComplexNested.level2.get('second').key, 'Complex Nested Map second key');
+  assertEqual(complexNested.level2.get('second').nestedDate.toISOString(), readComplexNested.level2.get('second').nestedDate.toISOString(), 'Complex Nested Map second nestedDate');
+
+  assertEqual(complexNested.level3.size, readComplexNested.level3.size, 'Complex Nested Set size');
+  const originalSetArray = Array.from(complexNested.level3);
+  const readSetArray = Array.from(readComplexNested.level3);
+  for (let i = 0; i < originalSetArray.length; i++) {
+    if (originalSetArray[i] instanceof Date) {
+      assertEqual(originalSetArray[i].toISOString(), readSetArray[i].toISOString(), `Complex Nested Set element ${i}`);
+    } else if (Buffer.isBuffer(originalSetArray[i])) {
+      assertBufferEqual(originalSetArray[i], readSetArray[i], `Complex Nested Set element ${i}`);
+    } else if (typeof originalSetArray[i] === 'object') {
+      assertEqual(originalSetArray[i].key, readSetArray[i].key, `Complex Nested Set element ${i} key`);
+      assertBufferEqual(originalSetArray[i].nestedBuffer, readSetArray[i].nestedBuffer, `Complex Nested Set element ${i} nestedBuffer`);
+    } else {
+      assertEqual(originalSetArray[i], readSetArray[i], `Complex Nested Set element ${i}`);
+    }
+  }
+
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+}
+
 function bitTests() {
   testInterleavedBitFields(); // Run the interleaved bit fields tests
   testBitFields();
@@ -964,7 +1228,7 @@ function bitTests() {
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
-  if ( BIT_ONLY ) {
+  if (BIT_ONLY) {
     bitTests();
   } else {
     testColorType();
@@ -988,6 +1252,10 @@ function runTests() {
     testPojoWithSet();
     runGzipTests();
     testFailVerify();
+    testComplexNestedStructures();
+    //testLargeDataSet();
+    testRandomizedData();
+    testAlphabetSoup();
   }
 
   cleanUp('private.key', true);
