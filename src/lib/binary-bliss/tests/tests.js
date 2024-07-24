@@ -1253,7 +1253,7 @@ function runTests() {
     runGzipTests();
     testFailVerify();
     testComplexNestedStructures();
-    //testLargeDataSet();
+    testLargeDataSet();
     testRandomizedData();
     testAlphabetSoup();
   }
