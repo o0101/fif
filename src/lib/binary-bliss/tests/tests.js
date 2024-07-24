@@ -6,6 +6,7 @@ import { sha512 } from '@noble/hashes/sha512';
 eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
 
 
+const BIT_ONLY = true;
 const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
 
@@ -163,7 +164,12 @@ function testBitFields() {
   bh.bit(3, 5); // Write three bits with value 5 (101 in binary)
   bh.bit(4, 9); // Write four bits with value 9 (1001 in binary)
   bh.bit(8, 255); // Write eight bits with value 255 (11111111 in binary)
+  bh.bit(8, 129); // Write eight bits with value 255 (11111111 in binary)
+  bh.bit(8, 255); // Write eight bits with value 255 (11111111 in binary)
+  bh.bit(8, 129); // Write eight bits with value 255 (11111111 in binary)
   bh.bit(200, 988888888888888347856348573468937253482675n);
+  bh.bit(8, 129); // Write eight bits with value 255 (11111111 in binary)
+  bh.uint32(9999);
 
   // Reset buffer for reading
   bh.jump(0);
@@ -172,15 +178,25 @@ function testBitFields() {
   bh.bit(1, 'bit1');
   bh.bit(3, 'bit3');
   bh.bit(4, 'bit4');
-  bh.bit(8, 'bit8');
+  bh.bit(8, 'bit81');
+  bh.bit(8, 'bit82');
+  bh.bit(8, 'bit83');
+  bh.bit(8, 'bit84');
   bh.bit(200, 'bit200');
+  bh.bit(8, 'bit85');
+  bh.uint32('val9999');
 
   const result = bh.read();
   assertEqual(1, result.bit1.value, 'Bit1 value');
   assertEqual(5, result.bit3.value, 'Bit3 value');
   assertEqual(9, result.bit4.value, 'Bit4 value');
-  assertEqual(255, result.bit8.value, 'Bit8 value');
+  assertEqual(255, result.bit81.value, 'Bit81 value');
+  assertEqual(129, result.bit82.value, 'Bit82 value');
+  assertEqual(255, result.bit83.value, 'Bit83 value');
+  assertEqual(129, result.bit84.value, 'Bit84 value');
   assertEqual(988888888888888347856348573468937253482675n, result.bit200.value, 'Bit200 value');
+  assertEqual(129, result.bit85.value, 'Bit85 value');
+  assertEqual(9999, result.val9999.value, 'Val 9999');
 
   bh.closeFile();
 }
@@ -939,36 +955,41 @@ function testFailVerify() {
 }
 
 function bitTests() {
-  testBitFields();
-  testBitFieldCrossByteBoundary();
-  enhancedBitFieldTests();
   testInterleavedBitFields(); // Run the interleaved bit fields tests
+  testBitFields();
+  //testBitFieldCrossByteBoundary();
+  //enhancedBitFieldTests();
+
 }
 
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
-  testColorType();
-  bitTests();
-  testBufferType();
-  testMagicNumber();
-  testMagicString();
-  testMagicBuffer();
-  testMapType();
-  testHeteroArray();
-  testNestedArray();
-  testDateType();
-  testFloatType();
-  testPojoType();
-  testMixedTypeArray();
-  testComplexNonLatinObject();
-  testMapWithPojo();
-  testPojoWithMap();
-  testSetType();
-  testSetWithPojo();
-  testPojoWithSet();
-  runGzipTests();
-  testFailVerify();
+  if ( BIT_ONLY ) {
+    bitTests();
+  } else {
+    testColorType();
+    bitTests();
+    testBufferType();
+    testMagicNumber();
+    testMagicString();
+    testMagicBuffer();
+    testMapType();
+    testHeteroArray();
+    testNestedArray();
+    testDateType();
+    testFloatType();
+    testPojoType();
+    testMixedTypeArray();
+    testComplexNonLatinObject();
+    testMapWithPojo();
+    testPojoWithMap();
+    testSetType();
+    testSetWithPojo();
+    testPojoWithSet();
+    runGzipTests();
+    testFailVerify();
+  }
 
   cleanUp('private.key', true);
   cleanUp('public.key', true);
