@@ -8,6 +8,7 @@
     "guutreader": "index.js"
   },
   "scripts": {
+    "clean": "rm -rf node_modules; rm package-lock.json; npm i",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js"
   },
@@ -25,8 +26,8 @@
   "author": "@dosy",
   "license": "Beerware",
   "dependencies": {
-    "axios": "^1.7.2",
-    "binary-bliss": "^1.0.3",
-    "readline-sync": "^1.4.10"
+    "binary-bliss": "latest",
+    "readline-sync": "latest",
+    "axios": "latest"
   }
 }
