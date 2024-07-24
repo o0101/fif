@@ -437,6 +437,8 @@ function testAlphabetSoup() {
   const handler = new BinaryHandler();
   handler.openFile(filePath);
 
+  const testDate = new Date('2024-07-24T10:00:00.000Z'); // Use a fixed date in Zulu time
+
   // Writing a mix of bit operations and various data types
   handler.bit(4, 15);  // Write 4 bits (1111)
   handler.uint32(123456789); // Write a 32-bit integer
@@ -451,9 +453,9 @@ function testAlphabetSoup() {
   handler.bit(1, 1);   // Write 1 bit (1)
   handler.buffer(Buffer.from('binary data')); // Write a buffer
   handler.bit(10, 1023); // Write 10 bits (1111111111)
-  handler.date(new Date('2024-07-24T10:00:00Z')); // Write a date
+  handler.date(testDate); // Write the fixed date
   handler.bit(12, 4095); // Write 12 bits (111111111111)
-  handler.heteroArray(['string', 789, new Date()]); // Write a hetero array
+  handler.heteroArray(['string', 789, testDate]); // Write a hetero array with the fixed date
   handler.bit(15, 32767); // Write 15 bits (111111111111111)
   handler.uint8(255); // Write an 8-bit integer
   handler.bool(true); // Write a boolean value
@@ -504,11 +506,11 @@ function testAlphabetSoup() {
   assertEqual(1, result.bit1.value, 'Alphabet Soup Bit1');
   assertBufferEqual(Buffer.from('binary data'), result.buffer.value, 'Alphabet Soup Buffer');
   assertEqual(1023, result.bit10.value, 'Alphabet Soup Bit10');
-  assertEqual(new Date('2024-07-24T10:00:00Z').toISOString(), result.date.value.toISOString(), 'Alphabet Soup Date');
+  assertEqual(testDate.toISOString(), result.date.value.toISOString(), 'Alphabet Soup Date');
   assertEqual(4095, result.bit12.value, 'Alphabet Soup Bit12');
   assertEqual('string', result.heteroArray.value[0], 'Alphabet Soup HeteroArray string');
   assertEqual(789, result.heteroArray.value[1], 'Alphabet Soup HeteroArray number');
-  assertEqual(new Date().toISOString(), result.heteroArray.value[2].toISOString(), 'Alphabet Soup HeteroArray date');
+  assertEqual(testDate.toISOString(), result.heteroArray.value[2].toISOString(), 'Alphabet Soup HeteroArray date');
   assertEqual(32767, result.bit15.value, 'Alphabet Soup Bit15');
   assertEqual(255, result.uint8.value, 'Alphabet Soup Uint8');
   assertEqual(true, result.bool1.value, 'Alphabet Soup Bool1');
@@ -1144,6 +1146,7 @@ function testLargeDataSet() {
   }
 
   handler.closeFile();
+  cleanUp(filePath, true);
 }
 
 function testComplexNestedStructures() {
