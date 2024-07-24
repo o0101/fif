@@ -3,7 +3,7 @@ import { Buffer } from 'buffer';
 import path from 'path';
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
-const DEBUG = false;
+const DEBUG = true;
 
 class BinaryHandler {
   constructor(endian = 'BE') {
@@ -13,15 +13,19 @@ class BinaryHandler {
     this.bitCursor = 0;
     this.reading = [];
     this.fd = null;
+    this.bitRemainder = 0; // Remainder bits from previous reads
+    this.bitRemainderLength = 0; // Number of remainder bits
   }
 
-  jump(cursor) {
+  jump(cursorPosition) {
+    DEBUG && console.log(`Jumping to cursor position: ${cursorPosition}`);
     if (this._buffer.length) {
       this._writeBytes(this._buffer);
       this._buffer = Buffer.alloc(0);
     }
-    this.cursor = cursor;
+    this.cursor = cursorPosition;
     this.bitCursor = 0;
+    return this;
   }
 
   // Function to write bits into a buffer with bitOffset
@@ -31,24 +35,26 @@ class BinaryHandler {
     }
 
     value = BigInt(value);
-    DEBUG && console.log(`\nWriting bits for length: ${length}, value: ${value.toString(2)}, bitOffset: ${bitOffset}`);
+    DEBUG && console.log(`\nWriting bits: length=${length}, value=${value.toString(2)}, bitOffset=${bitOffset}`);
 
     const byteAddr = i => Math.floor((i + bitOffset) / 8);
     const bitAddr = i => (i + bitOffset) % 8;
 
     for (let i = 0; i < length; i++) {
-      const mask = 1n << BigInt(i);
-      const iBit = (value & mask) >> BigInt(i);
+      const mask = 1n << BigInt(length - 1 - i);
+      const iBit = (value & mask) >> BigInt(length - 1 - i);
       const byteIndex = byteAddr(i);
       const bitIndex = bitAddr(i);
 
-      if (bitIndex === 0) {
-        buffer[byteIndex] = 0; // Clear the byte before setting bits
+      if (bitIndex === 0 && byteIndex >= buffer.length) {
+        buffer = Buffer.concat([buffer, Buffer.alloc(1)]); // Extend the buffer
       }
-      
+
+      DEBUG && console.log(`Setting bit at byteIndex=${byteIndex}, bitIndex=${bitIndex}, iBit=${iBit}`);
       buffer[byteIndex] |= Number(iBit) << bitIndex;
     }
 
+    DEBUG && console.log(`Buffer after writeBits: ${buffer.toString('hex')}`);
     return { buffer, bitOffset: (bitOffset + length) % 8 };
   }
 
@@ -59,7 +65,7 @@ class BinaryHandler {
     }
 
     let value = BigInt(0);
-    DEBUG && console.log(`\nReading bits for length: ${length}, bitOffset: ${bitOffset}`);
+    DEBUG && console.log(`\nReading bits: length=${length}, bitOffset=${bitOffset}`);
 
     const byteAddr = i => Math.floor((i + bitOffset) / 8);
     const bitAddr = i => (i + bitOffset) % 8;
@@ -69,23 +75,53 @@ class BinaryHandler {
       const bitIndex = bitAddr(i);
 
       const bit = (buffer[byteIndex] >> bitIndex) & 1;
-      value |= BigInt(bit) << BigInt(i);
+      value |= BigInt(bit) << BigInt(length - 1 - i);
+      DEBUG && console.log(`Reading bit at byteIndex=${byteIndex}, bitIndex=${bitIndex}, bit=${bit}`);
     }
 
+    DEBUG && console.log(`Value after readBits: ${value.toString(2)}`);
     return { value, bitOffset: (bitOffset + length) % 8 };
   }
 
   bit(length, keyOrValue) {
     const byteLength = Math.ceil((this.bitCursor + length) / 8);
+    DEBUG && console.log(`\nBit operation: length=${length}, keyOrValue=${keyOrValue}, byteLength=${byteLength}`);
     if (typeof keyOrValue === 'string') {
       // Read mode
       if (byteLength > this._buffer.length) {
         this._buffer = Buffer.concat([this._buffer, this._readBytes(byteLength - this._buffer.length)]);
       }
 
-      const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
-      this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
-      this.bitCursor = bitOffset;
+      // Combine remainder bits with new bits if necessary
+      if (this.bitRemainderLength > 0) {
+        const totalBits = this.bitRemainderLength + length;
+        const remainderShift = BigInt(this.bitRemainder) << BigInt(length);
+        const { value: newBits, bitOffset } = this.readBits(totalBits, this._buffer, this.bitCursor);
+        const combinedValue = remainderShift | newBits;
+        this.bitRemainder = 0;
+        this.bitRemainderLength = 0;
+
+        // Handle any unused bits from combined value
+        const unusedBits = totalBits - length;
+        const finalValue = combinedValue >> BigInt(unusedBits);
+        const newRemainder = combinedValue & ((1n << BigInt(unusedBits)) - 1n);
+
+        this.reading.push({ key: keyOrValue, value: finalValue, type: `bit_${length}` });
+        this.bitCursor = bitOffset;
+
+        if (unusedBits > 0) {
+          this.bitRemainder = Number(newRemainder);
+          this.bitRemainderLength = unusedBits;
+        }
+
+        DEBUG && console.log(`Combined read: finalValue=${finalValue.toString(2)}, newRemainder=${newRemainder.toString(2)}, bitCursor=${this.bitCursor}`);
+      } else {
+        const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
+        this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
+        this.bitCursor = bitOffset;
+        DEBUG && console.log(`Direct read: value=${value.toString(2)}, bitCursor=${this.bitCursor}`);
+      }
+
       return this;
     } else {
       // Write mode
@@ -97,6 +133,7 @@ class BinaryHandler {
       this.bitCursor = bitOffset;
       this._buffer = buffer;
 
+      DEBUG && console.log(`Write operation: buffer=${buffer.toString('hex')}, bitCursor=${this.bitCursor}`);
       return this;
     }
   }
@@ -111,6 +148,7 @@ class BinaryHandler {
       this.fd = openSync(safePath, isWritable ? 'r+' : 'r');
     }
     this.filePath = filePath;
+    DEBUG && console.log(`File opened: ${this.filePath}, fd=${this.fd}`);
     return this;
   }
 
@@ -123,6 +161,7 @@ class BinaryHandler {
       closeSync(this.fd);
       this.fd = null;
     }
+    DEBUG && console.log(`File closed: ${this.filePath}`);
     return this;
   }
 
@@ -163,6 +202,8 @@ class BinaryHandler {
         BinaryUtils.decode(buffer);
       }
       this.cursor += length;
+
+      DEBUG && console.log(`Read bytes: length=${length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
       return buffer;
     } catch (error) {
       console.error('Error reading bytes:', error);
@@ -179,6 +220,8 @@ class BinaryHandler {
       }
       writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
       this.cursor += buffer.length;
+
+      DEBUG && console.log(`Wrote bytes: length=${buffer.length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
     } catch (error) {
       console.error('Error writing bytes:', error);
       throw error;
@@ -190,15 +233,20 @@ class BinaryHandler {
     for (const { key, value, type } of this.reading) {
       result[key] = { value, type };
     }
+    DEBUG && console.log(`Read result: `, result);
     return result;
   }
 
   get last() {
-    return this.reading.length ? this.reading[this.reading.length - 1] : null;
+    const lastItem = this.reading.length ? this.reading[this.reading.length - 1] : null;
+    DEBUG && console.log(`Last item: ${JSON.stringify(lastItem)}`);
+    return lastItem;
   }
 
   $(searchKey) {
-    return this.reading.findLast(item => item.key === searchKey) || null;
+    const foundItem = this.reading.findLast(item => item.key === searchKey) || null;
+    DEBUG && console.log(`Find item by key (${searchKey}): ${JSON.stringify(foundItem)}`);
+    return foundItem;
   }
 }
 
