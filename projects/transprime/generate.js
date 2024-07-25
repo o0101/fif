@@ -2,8 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { BinaryHandler } from 'binary-bliss';
 import { performance } from 'perf_hooks';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const cache = [];
+
+const isPrime = num => {
+  const sqrt = Math.ceil(Math.sqrt(num));
+  if ( cache.lengt && sqrt <= cache[cache.length - 1] ) {
+    return isPrimeCached(num);
+  } else {
+    return isPrimeNaive(num);
+  }
+};
 
 // Prime generation function
 const isPrimeNaive = (num) => {
@@ -36,18 +47,26 @@ const isPrimeCached = (num) => {
   return true;
 };
 
-const generateFirstPrimes = (limit, useCache) => {
-  const primes = [];
-  let num = 2;
-  const isPrime = useCache ? isPrimeCached : isPrimeNaive;
+const generateFirstPrimes = (limit, { noCache } = {}) => {
+  const primes = [2, 3];
+  let num = 5;
+  const isPrime = noCache ? isPrimeNaive : isPrimeCached;
   while (primes.length < limit) {
     if (isPrime(num)) {
       primes.push(num);
-      if (useCache && primes.length > cache.length) {
+      if (!noCache && primes.length > cache.length) {
         cache.push(num);
       }
     }
-    num++;
+    const r6 = num % 6;
+    switch (r6) {
+      case 1:
+        num += 4; break;
+      case 5:
+        num += 2; break;
+      default:
+        num++; break;
+    }
   }
   return primes;
 };
@@ -67,8 +86,8 @@ const splitPrimes = (primes) => {
 };
 
 // Save primes to binary file
-const savePrimesToFile = (n, filePath, useCache) => {
-  const primes = generateFirstPrimes(n, useCache);
+const savePrimesToFile = (n, filePath, { noCache } = {}) => {
+  const primes = generateFirstPrimes(n, { noCache });
   const { primes16, primes32 } = splitPrimes(primes);
 
   const handler = new BinaryHandler();
@@ -84,23 +103,27 @@ const savePrimesToFile = (n, filePath, useCache) => {
 };
 
 // Read primes from binary file
-const readPrimesFromFile = (filePath) => {
+const readPrimesFromFile = (n, filePath) => {
   const handler = new BinaryHandler();
   handler.openFile(filePath);
 
   const primes = [];
 
   const primes16Length = handler.uint32('primes16Length').last.value;
-  for (let i = 0; i < primes16Length; i++) {
+  for (let i = 0; i < Math.min(n, primes16Length); i++) {
     primes.push(handler.uint16(`prime16_${i}`).last.value);
   }
 
   const primes32Length = handler.uint32('primes32Length').last.value;
-  for (let i = 0; i < primes32Length; i++) {
+  for (let i = 0; i < Math.min(n, primes32Length); i++) {
     primes.push(handler.uint32(`prime32_${i}`).last.value);
   }
 
   handler.closeFile();
+
+  if ( ! verifyPrimes(n, primes) ) {
+    throw new Error('Primes are incorrect.');
+  }
 
   return primes;
 };
@@ -119,7 +142,7 @@ const verifyPrimes = (n, primes) => {
 // Main execution
 function main() {
   const n = process.argv[2] ? parseInt(process.argv[2]) : 65536;
-  const useCache = process.argv.includes('--cache');
+  const noCache = process.argv.includes('--no-cache');
   const filePath = `primes${n}.bin`;
 
   if (Number.isNaN(n)) {
@@ -127,15 +150,29 @@ function main() {
     return;
   }
 
-  console.log(`Generating ${n} primes using ${useCache ? 'cached' : 'naive'} method.`);
+  if (fs.existsSync(filePath)) {
+    console.log(`File ${filePath} exists. Verifying primes...`);
+    try {
+      const readPrimes = readPrimesFromFile(n, filePath);
+      console.log('All primes are verified successfully.');
+      console.log('Primes read from file:', readPrimes);
+      console.log(`Last prime (${readPrimes.length}th prime): ${readPrimes[readPrimes.length - 1]}`);
+      return;
+    } catch(e) {
+      console.error(e);
+      console.error('Prime verification failed.');
+    }
+  }
+
+  console.log(`Generating ${n} primes using ${noCache ? 'naive' : 'cache'} method.`);
 
   const startTime = performance.now();
-  savePrimesToFile(n, filePath, useCache);
+  savePrimesToFile(n, filePath, { noCache });
   const endTime = performance.now();
 
   console.log(`Time taken to generate and save primes: ${(endTime - startTime).toFixed(2)} ms`);
 
-  const readPrimes = readPrimesFromFile(filePath);
+  const readPrimes = readPrimesFromFile(n, filePath);
   const isVerified = verifyPrimes(n, readPrimes);
 
   if (isVerified) {
@@ -147,5 +184,19 @@ function main() {
   }
 }
 
-main();
+// Exporting functions
+export {
+  isPrime,
+  generateFirstPrimes,
+  readPrimesFromFile,
+  main
+};
+
+// Running main if the script is called directly
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+if (__filename.endsWith(process.argv[1])) {
+  main();
+}
 
