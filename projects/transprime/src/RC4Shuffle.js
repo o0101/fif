@@ -1,7 +1,7 @@
 // RC4Shuffle.js
 import { KeyedShuffle } from './KeyedShuffle.js';
 
-class RC4 {
+export class RC4 {
   constructor(key) {
     this.key = key;
     this.S = [];
@@ -49,6 +49,7 @@ export class RC4Shuffle extends KeyedShuffle {
 
   shuffle(matrix, key) {
     const rows = matrix.length;
+    if ( rows == 0 ) return matrix;
     const cols = matrix[0].length;
     const flatArray = this.flatten(matrix);
     const rc4 = new RC4(key);
@@ -63,6 +64,7 @@ export class RC4Shuffle extends KeyedShuffle {
 
   unshuffle(matrix, key) {
     const rows = matrix.length;
+    if ( rows == 0 ) return matrix;
     const cols = matrix[0].length;
     const flatArray = this.flatten(matrix);
     const rc4 = new RC4(key);

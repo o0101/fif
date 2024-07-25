@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { RC4Shuffle } from '../RC4Shuffle.js';
+import { RC4Shuffle } from '../src/RC4Shuffle.js';
 
 describe('RC4Shuffle', () => {
   let rc4Shuffle;
