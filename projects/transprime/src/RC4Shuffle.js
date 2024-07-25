@@ -69,18 +69,6 @@ export class RC4Shuffle extends KeyedShuffle {
     super();
   }
 
-  flatten(matrix) {
-    return matrix.reduce((acc, val) => acc.concat(val), []);
-  }
-
-  unflatten(array, rows, cols) {
-    let result = [];
-    for (let i = 0; i < rows; i++) {
-      result.push(array.slice(i * cols, i * cols + cols));
-    }
-    return result;
-  }
-
   shuffle(matrix, key) {
     const rows = matrix.length;
     if (rows == 0) return matrix;
