@@ -53,6 +53,7 @@ export class RC4 {
 }
 
 export class RC4Shuffle extends KeyedShuffle {
+  static get MAX_RANGE() { return 256; }
   getKeystream(key, length) {
     const rc4 = new RC4(RC4.prepare(key));
     return {

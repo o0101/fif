@@ -1,5 +1,9 @@
 // KeyedShuffle.js
 export class KeyedShuffle {
+  static get MAX_RANGE() {
+    throw new Error('MAX_RANGE must be overridden in subclass');
+  }
+
   flatten(matrix) {
     return matrix.reduce((acc, val) => acc.concat(val), []);
   }
@@ -16,8 +20,8 @@ export class KeyedShuffle {
     const rows = matrix.length;
     if (rows == 0) return matrix;
     const cols = matrix[0].length;
-    if (rows > 256 || cols > 256) {
-      throw new Error('Matrix dimensions must be 256 or smaller.');
+    if (rows > this.constructor.MAX_RANGE || cols > this.constructor.MAX_RANGE) {
+      throw new Error(`Matrix dimensions must be ${this.constructor.MAX_RANGE} or smaller.`);
     }
     const flatArray = this.flatten(matrix);
     const keystream = this.getKeystream(key, flatArray.length);
@@ -34,8 +38,8 @@ export class KeyedShuffle {
     const rows = matrix.length;
     if (rows == 0) return matrix;
     const cols = matrix[0].length;
-    if (rows > 256 || cols > 256) {
-      throw new Error('Matrix dimensions must be 256 or smaller.');
+    if (rows > this.constructor.MAX_RANGE || cols > this.constructor.MAX_RANGE) {
+      throw new Error(`Matrix dimensions must be ${this.constructor.MAX_RANGE} or smaller.`);
     }
     const flatArray = this.flatten(matrix);
     const keystream = this.getKeystream(key, flatArray.length);
@@ -55,11 +59,11 @@ export class KeyedShuffle {
   }
 
   getRandomIndex(keystream, range) {
-    if (range > 256) {
-      throw new Error('Range must be 256 or smaller.');
+    if (range > this.constructor.MAX_RANGE) {
+      throw new Error(`Range must be ${this.constructor.MAX_RANGE} or smaller.`);
     }
     let r;
-    const maxValid = Math.floor(256 / range) * range;
+    const maxValid = Math.floor(this.constructor.MAX_RANGE / range) * range;
     do {
       r = keystream.next();
     } while (r >= maxValid);
