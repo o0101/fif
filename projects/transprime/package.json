@@ -6,7 +6,8 @@
   "main": "src/lib.js",
   "module": "src/lib.js",
   "scripts": {
-    "test": "node src/tool.js"
+    "test-tool": "node src/tool.js",
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
@@ -29,5 +30,9 @@
   "homepage": "https://github.com/o0101/fif#readme",
   "dependencies": {
     "binary-bliss": "^1.1.0"
+  },
+  "devDependencies": {
+    "chai": "^5.1.1",
+    "mocha": "^10.7.0"
   }
 }
