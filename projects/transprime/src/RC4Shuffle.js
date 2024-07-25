@@ -50,6 +50,15 @@ export class RC4 {
     }
     return stream;
   }
+
+  getRandomIndex(range) {
+    let r;
+    const maxValid = Math.floor(256 / range) * range;
+    do {
+      r = this.next();
+    } while (r >= maxValid);
+    return r % range;
+  }
 }
 
 export class RC4Shuffle extends KeyedShuffle {
@@ -73,11 +82,14 @@ export class RC4Shuffle extends KeyedShuffle {
     const rows = matrix.length;
     if (rows == 0) return matrix;
     const cols = matrix[0].length;
+    if (rows > 256 || cols > 256) {
+      throw new Error('Matrix dimensions must be 256 or smaller.');
+    }
     const flatArray = this.flatten(matrix);
     const rc4 = new RC4(key);
 
     for (let i = flatArray.length - 1; i > 0; i--) {
-      const j = rc4.next() % (i + 1);
+      const j = rc4.getRandomIndex(i + 1);
       [flatArray[i], flatArray[j]] = [flatArray[j], flatArray[i]]; // Swap
     }
 
@@ -88,12 +100,15 @@ export class RC4Shuffle extends KeyedShuffle {
     const rows = matrix.length;
     if (rows == 0) return matrix;
     const cols = matrix[0].length;
+    if (rows > 256 || cols > 256) {
+      throw new Error('Matrix dimensions must be 256 or smaller.');
+    }
     const flatArray = this.flatten(matrix);
     const rc4 = new RC4(key);
 
     const indexMap = flatArray.map((_, i) => i);
     for (let i = indexMap.length - 1; i > 0; i--) {
-      const j = rc4.next() % (i + 1);
+      const j = rc4.getRandomIndex(i + 1);
       [indexMap[i], indexMap[j]] = [indexMap[j], indexMap[i]]; // Swap
     }
 
