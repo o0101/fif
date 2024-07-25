@@ -31,7 +31,7 @@ export class AES {
   }
 
   next() {
-    const buffer = Buffer.alloc(2); // 16-bit output
+    const buffer = new Uint8Array(2); // 16-bit output
     const encrypted = this.cipher.update(buffer);
     const val = encrypted.readUInt16BE(0);
     return val;
@@ -48,10 +48,12 @@ export class AES {
 
 export class AESShuffle extends KeyedShuffle {
   static get MAX_RANGE() { return 65536; }
+
   constructor() {
     super();
     this.iv = randomBytes(16);
   }
+
   getKeystream(key, length) {
     const aes = new AES(AES.prepare(key), this.iv);
     return {
