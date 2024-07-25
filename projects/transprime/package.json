@@ -7,7 +7,9 @@
   "module": "src/lib.js",
   "scripts": {
     "test-tool": "node src/tool.js",
-    "test": "mocha"
+    "test": "mocha",
+    "postinstall": "node ./scripts/vec2js.js > ./scripts/vectors.js;",
+    "pretest": "npm run postinstall"
   },
   "repository": {
     "type": "git",

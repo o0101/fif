@@ -8,6 +8,8 @@ export class RC4 {
     } else if (typeof key === "string") {
       const codes = [...key].map(char => char.codePointAt(0));
       return new Uint8Array(codes);
+    } else if (Array.isArray(key)) {
+      return new Uint8Array(key);
     } else {
       throw new TypeError(`Don't know how to convert: ${key} to Uint8Array`);
     }

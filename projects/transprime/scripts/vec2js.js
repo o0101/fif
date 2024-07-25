@@ -1,7 +1,8 @@
 import fs from 'fs';
+import path from 'path';
 
 // Read the file synchronously
-const data = fs.readFileSync('rc4_vectors.txt', 'utf8');
+const data = fs.readFileSync(path.resolve('scripts', 'rc4_vectors.txt'), 'utf8');
 
 // Function to parse key and vectors
 function parseVectors(data) {
@@ -60,5 +61,5 @@ const output = JSON.stringify(parsedData,function(k,v){
    return v;
 },2);
 
-console.log(`const testVectors = ${output.replace(/"/g, '')};`);
+console.log(`export const testVectors = ${output.replace(/"/g, '')};`);
 
