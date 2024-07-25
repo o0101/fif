@@ -1,0 +1,28 @@
+{
+  "name": "transprime",
+  "version": "1.0.0",
+  "description": "a new block cipher",
+  "main": "src/lib.js",
+  "scripts": {
+    "test": "node src/tool.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/o0101/fif.git"
+  },
+  "keywords": [
+    "block-cipher",
+    "rainsum",
+    "rain",
+    "hashes",
+    "flexible",
+    "design",
+    "unproven"
+  ],
+  "author": "@dosy",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/o0101/fif/issues"
+  },
+  "homepage": "https://github.com/o0101/fif#readme"
+}
