@@ -1,21 +1,32 @@
 import fs from 'fs';
 import path from 'path';
 import { BinaryHandler } from 'binary-bliss';
+import { performance } from 'perf_hooks';
 
 const cache = [];
 
 // Prime generation function
-const isPrime = (num) => {
+const isPrimeNaive = (num) => {
+  if (num <= 1) return false;
+  if (num <= 3) return true;
+  if (num % 2 === 0 || num % 3 === 0) return false;
+  for (let i = 5; i * i <= num; i += 6) {
+    if (num % i === 0 || num % (i + 2) === 0) return false;
+  }
+  return true;
+};
+
+const isPrimeCached = (num) => {
   if (num <= 1) return false;
   if (num <= 3) return true;
   if (num % 2 === 0 || num % 3 === 0) return false;
   const cacheTop = cache[cache.length - 1];
   const sqrt = Math.ceil(Math.sqrt(num));
-  if ( sqrt**2 == num ) return false;
-  if ( sqrt <= cacheTop ) {
-    for( let prime of cache ) {
-      if ( sqrt < prime ) break;
-      if ( num % prime === 0 ) return false;
+  if (sqrt ** 2 == num) return false;
+  if (sqrt <= cacheTop) {
+    for (let prime of cache) {
+      if (sqrt < prime) break;
+      if (num % prime === 0) return false;
     }
   } else {
     for (let i = 5; i * i <= num; i += 6) {
@@ -25,14 +36,14 @@ const isPrime = (num) => {
   return true;
 };
 
-const generateFirstPrimes = (limit) => {
+const generateFirstPrimes = (limit, useCache) => {
   const primes = [];
   let num = 2;
+  const isPrime = useCache ? isPrimeCached : isPrimeNaive;
   while (primes.length < limit) {
     if (isPrime(num)) {
       primes.push(num);
-      if ( primes.length > cache.length ) {
-        // extend cache with uniques
+      if (useCache && primes.length > cache.length) {
         cache.push(num);
       }
     }
@@ -56,8 +67,8 @@ const splitPrimes = (primes) => {
 };
 
 // Save primes to binary file
-const savePrimesToFile = (n, filePath) => {
-  const primes = generateFirstPrimes(n);
+const savePrimesToFile = (n, filePath, useCache) => {
+  const primes = generateFirstPrimes(n, useCache);
   const { primes16, primes32 } = splitPrimes(primes);
 
   const handler = new BinaryHandler();
@@ -100,7 +111,7 @@ const verifyPrimes = (n, primes) => {
   const primesSet = new Set(primes);
   if (primesSet.size !== primes.length) return false;
   for (let prime of primes) {
-    if (!isPrime(prime)) return false;
+    if (!isPrimeNaive(prime)) return false;
   }
   return true;
 };
@@ -108,22 +119,33 @@ const verifyPrimes = (n, primes) => {
 // Main execution
 function main() {
   const n = process.argv[2] ? parseInt(process.argv[2]) : 65536;
-  if ( Number.isNaN(n) ) {
-    n = 65536;
-  }
+  const useCache = process.argv.includes('--cache');
   const filePath = `primes${n}.bin`;
-  savePrimesToFile(n, filePath);
+
+  if (Number.isNaN(n)) {
+    console.error('Invalid number provided.');
+    return;
+  }
+
+  console.log(`Generating ${n} primes using ${useCache ? 'cached' : 'naive'} method.`);
+
+  const startTime = performance.now();
+  savePrimesToFile(n, filePath, useCache);
+  const endTime = performance.now();
+
+  console.log(`Time taken to generate and save primes: ${(endTime - startTime).toFixed(2)} ms`);
+
   const readPrimes = readPrimesFromFile(filePath);
   const isVerified = verifyPrimes(n, readPrimes);
 
   if (isVerified) {
     console.log('All primes are verified successfully.');
     console.log('Primes read from file:', readPrimes);
-    console.log(`Last prime (${readPrimes.length}th prime): ${readPrimes[readPrimes.length-1]}`);
+    console.log(`Last prime (${readPrimes.length}th prime): ${readPrimes[readPrimes.length - 1]}`);
   } else {
     console.error('Prime verification failed.');
-    console.log(cache);
   }
 }
 
 main();
+
