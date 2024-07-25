@@ -64,3 +64,17 @@ export class RC4Shuffle extends KeyedShuffle {
   }
 }
 
+export class RC4ShuffleDouble extends KeyedShuffle {
+  static get MAX_RANGE() { return 65536; }
+  getKeystream(key, length) {
+    const rc4 = new RC4(RC4.prepare(key));
+    return {
+      next: () => {
+        const m = rc4.next();
+        const r = rc4.next();
+        return m*256+r;
+      }
+    };
+  }
+}
+

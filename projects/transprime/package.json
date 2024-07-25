@@ -31,6 +31,7 @@
   },
   "homepage": "https://github.com/o0101/fif#readme",
   "dependencies": {
+    "@dosyago/rainsum": "^1.1.1",
     "binary-bliss": "^1.1.0"
   },
   "devDependencies": {
