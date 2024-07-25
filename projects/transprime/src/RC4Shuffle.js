@@ -52,6 +52,9 @@ export class RC4 {
   }
 
   getRandomIndex(range) {
+    if (range > 256) {
+      throw new Error('Range must be 256 or smaller.');
+    }
     let r;
     const maxValid = Math.floor(256 / range) * range;
     do {
