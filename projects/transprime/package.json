@@ -1,8 +1,10 @@
 {
   "name": "transprime",
   "version": "1.0.0",
+  "type": "module",
   "description": "a new block cipher",
   "main": "src/lib.js",
+  "module": "src/lib.js",
   "scripts": {
     "test": "node src/tool.js"
   },
@@ -24,5 +26,8 @@
   "bugs": {
     "url": "https://github.com/o0101/fif/issues"
   },
-  "homepage": "https://github.com/o0101/fif#readme"
+  "homepage": "https://github.com/o0101/fif#readme",
+  "dependencies": {
+    "binary-bliss": "^1.1.0"
+  }
 }
