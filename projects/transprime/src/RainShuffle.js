@@ -22,12 +22,25 @@ export class Rain {
     }
     this.key = key;
     this.state = new Uint8Array(this.key);
+    this.index = 0;
+    this.first = true;
   }
 
   async next() {
-    const hash = await rainstormHash(256, 0, this.state);
-    this.state = Buffer.from(hash, 'hex');
-    const val = this.state.readUint16BE(0);
+    if ( this.first ) {
+      this.first = false;
+      for( let i = 0; i < 10; i++ ) {
+        const hash = await rainstormHash(256, 0, this.state);
+        this.state = Buffer.from(hash, 'hex');
+      }
+    }
+    const val = this.state.readUint16BE(this.index);
+    this.index += 2;
+    if ( this.index >= this.state.length ) {
+      const hash = await rainstormHash(256, 0, this.state);
+      this.state = Buffer.from(hash, 'hex');
+      this.index = 0;
+    }
     return val;
   }
 

@@ -1,0 +1,1 @@
+- update rain hashes js api to output a buffer / uint8array 
