@@ -151,6 +151,56 @@ class BinaryHandler {
       return this;
     }
 
+  // Variable length coding
+    writeLength(length) {
+      if (length > 0x3FFFFFFF) { // 2^30 - 1
+        throw new Error('Length exceeds the maximum allowed value. Consider breaking your data into smaller chunks.');
+      }
+
+      let buffer;
+      if (length <= 0x3F) { // 00 - 1 byte
+        buffer = Buffer.alloc(1);
+        buffer.writeUInt8(length, 0);
+      } else if (length <= 0x3FFF) { // 01 - 2 bytes
+        buffer = Buffer.alloc(2);
+        buffer.writeUInt16BE(length | 0x4000, 0);
+      } else if (length <= 0x3FFFFF) { // 10 - 3 bytes
+        buffer = Buffer.alloc(3);
+        buffer.writeUIntBE(length | 0x800000, 0, 3);
+      } else { // 11 - 4 bytes
+        buffer = Buffer.alloc(4);
+        buffer.writeUInt32BE(length | 0xC0000000, 0);
+      }
+      this._writeBytes(buffer);
+    }
+
+    readLength() {
+      const firstByte = this._readBytes(1).readUInt8(0);
+      let length;
+      if ((firstByte & 0xC0) === 0x00) { // 00
+        length = firstByte & 0x3F;
+      } else if ((firstByte & 0xC0) === 0x40) { // 01
+        const buffer = Buffer.alloc(2);
+        buffer[0] = firstByte;
+        buffer[1] = this._readBytes(1).readUInt8(0);
+        length = ((buffer.readUInt16BE(0) & 0x3FFF));
+      } else if ((firstByte & 0xC0) === 0x80) { // 10
+        const buffer = Buffer.alloc(3);
+        buffer[0] = firstByte;
+        buffer[1] = this._readBytes(1).readUInt8(0);
+        buffer[2] = this._readBytes(1).readUInt8(0);
+        length = ((buffer.readUIntBE(0,3) & 0x3FFFFF));
+      } else { // 11
+        const buffer = Buffer.alloc(3);
+        buffer[0] = firstByte;
+        buffer[1] = this._readBytes(1).readUInt8(0);
+        buffer[2] = this._readBytes(1).readUInt8(0);
+        buffer[3] = this._readBytes(1).readUInt8(0);
+        length = ((buffer.readUInt32BE(0, 3) & 0x3FFFFFFF));
+      }
+      return length;
+    }
+
   // Cursor management
     jump(cursorPosition) {
       DEBUG && console.log(`Jumping to cursor position: ${cursorPosition}`);
@@ -506,7 +556,7 @@ class BinaryHandler {
       if (typeof keyOrBuffer === 'string') {
         this._alignToNextRead();
         const key = keyOrBuffer;
-        const length = this.uint32('length').last.value;
+        const length = this.readLength();
         this._validateLength(length);
         this._ensureBytes(length);
         const buffer = this._readBytes(length);
@@ -516,7 +566,7 @@ class BinaryHandler {
         this._alignToNextWrite();
         const buffer = keyOrBuffer;
         this._validateBuffer(buffer);
-        this.uint32(buffer.length);
+        this.writeLength(buffer.length);
         this._writeBytes(buffer);
         return this;
       } else {
@@ -602,7 +652,7 @@ class BinaryHandler {
       if (typeof keyOrValue === 'string') {
         this._alignToNextRead();
         const key = keyOrValue;
-        const length = this.uint32('length').last.value;
+        const length = this.readLength();
         this._validateLength(length);
         this._ensureBytes(length);
         const buffer = this._readBytes(length);
@@ -616,7 +666,7 @@ class BinaryHandler {
           hex = '0'+hex;
         }
         const buffer = Buffer.from(hex, 'hex');
-        this.uint32(buffer.length);
+        this.writeLength(buffer.length);
         this._writeBytes(buffer);
         return this;
       } else {
@@ -654,7 +704,7 @@ class BinaryHandler {
       if (Array.isArray(keyOrValue)) {
         this._alignToNextWrite();
         const values = keyOrValue;
-        this.uint32(values.length);
+        this.writeLength(values.length);
         for (let i = 0; i < values.length; i++) {
           this._writeTypeAndValue(values[i]);
           if (delimiter && i < values.length - 1) {
@@ -666,8 +716,7 @@ class BinaryHandler {
         this._alignToNextRead();
         const key = keyOrValue;
         const values = [];
-        this.uint32('length');
-        const length = this.$('length').value;
+        const length = this.readLength();
         for (let i = 0; i < length; i++) {
           const value = this._readTypeAndValue();
           values.push(value);
@@ -681,7 +730,7 @@ class BinaryHandler {
       if (keyOrValue instanceof Map) {
         this._alignToNextWrite();
         const map = keyOrValue;
-        this.uint32(map.size);
+        this.writeLength(map.size);
         for (const [key, value] of map.entries()) {
           this.puts(key);
           this._writeTypeAndValue(value);
@@ -691,8 +740,7 @@ class BinaryHandler {
         this._alignToNextRead();
         const key = keyOrValue;
         const map = new Map();
-        this.uint32('length');
-        const length = this.$('length').value;
+        const length = this.readLength();
         for (let i = 0; i < length; i++) {
           this.gets(`key${i}`);
           const key = this.$(`key${i}`).value;
@@ -708,7 +756,7 @@ class BinaryHandler {
       if (keyOrValue instanceof Set) {
         this._alignToNextWrite();
         const set = keyOrValue;
-        this.uint32(set.size);
+        this.writeLength(set.size);
         for (const value of set.values()) {
           this._writeTypeAndValue(value);
         }
@@ -717,8 +765,7 @@ class BinaryHandler {
         this._alignToNextRead();
         const key = keyOrValue;
         const set = new Set();
-        this.uint32('length');
-        const length = this.$('length').value;
+        const length = this.readLength();
         for (let i = 0; i < length; i++) {
           const value = this._readTypeAndValue();
           set.add(value);
@@ -733,7 +780,7 @@ class BinaryHandler {
         this._alignToNextWrite();
         const obj = keyOrValue;
         const keys = Object.keys(obj);
-        this.uint32(keys.length);
+        this.writeLength(keys.length);
         for (const key of keys) {
           this.puts(key);
           this._writeTypeAndValue(obj[key]);
@@ -743,8 +790,7 @@ class BinaryHandler {
         this._alignToNextRead();
         const key = keyOrValue;
         const obj = {};
-        this.uint32('length');
-        const length = this.$('length').value;
+        const length = this.readLength();
         for (let i = 0; i < length; i++) {
           this.gets(`key${i}`);
           const propKey = this.$(`key${i}`).value;
