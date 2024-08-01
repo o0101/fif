@@ -35,16 +35,16 @@ fileToBigIntWithBinaryBliss(process.argv[2], process.argv[2] + '.f2bf');
       try {
         savedFactors = [];
         ({ factors, remainder } = await Promise.race([
-          factorizeBigInt(bigInt, 20000000n, signal, controller),
+          factorizeBigInt(bigInt, 20000000n, controller),
           throwAfter(timeLimit, controller)
         ]));
         factorCount = factors.length;
       } catch (error) {
-        if (error.message === 'timeout') {
+        if (error.message === 'timeout' || error.message === 'aborted') {
           // Append a random digit to the BigInt and continue
           const randomDigit = BigInt(Math.floor(Math.random() * 10));
           const smoothness = savedFactors.reduce((sum, {exponent}) => sum + exponent, 0);
-          console.log(savedFactors, smoothness);
+          console.log({savedFactors, smoothness, fuzzTail});
           if ( !first && smoothness >= 5 ) {
             // length looks good, try another digit
             console.log(`Timed out. Fuzzing to find smooth. Replacing: ${randomDigit}`);
@@ -56,6 +56,7 @@ fileToBigIntWithBinaryBliss(process.argv[2], process.argv[2] + '.f2bf');
             fuzzTail += randomDigit.toString();
           }
         } else {
+          console.log('at error', {savedFactors, smoothness, fuzzTail});
           throw error; // Rethrow unexpected errors
         }
       }
@@ -120,14 +121,14 @@ fileToBigIntWithBinaryBliss(process.argv[2], process.argv[2] + '.f2bf');
   }
 
 // helpers
-  async function factorizeBigInt(bigInt, limit, signal, controller) {
+  async function factorizeBigInt(bigInt, limit, controller) {
     const factors = [];
     let smoothness = 0;
     let current = bigInt;
     let sleepAbove = 2n + 30n;
 
     for (let i = 2n; i <= limit;) {
-      if (signal.aborted) {
+      if (controller?.signal?.aborted) {
         throw new Error('aborted');
       }
 
@@ -175,7 +176,10 @@ fileToBigIntWithBinaryBliss(process.argv[2], process.argv[2] + '.f2bf');
   // Helper function to throw a timeout error after a specified duration and abort the operation
   function throwAfter(ms, controller) {
     return new Promise((_, reject) => {
-      setTimeout(() => {
+      let rejector;
+      controller.signal.addEventListener('abort', () => clearTimeout(rejector));
+      rejector = setTimeout(() => {
+        if ( controller?.signal?.aborted ) return;
         controller.abort();
         reject(new Error('timeout'));
       }, ms);
