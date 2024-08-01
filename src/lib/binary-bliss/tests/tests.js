@@ -1270,6 +1270,91 @@ function bitTests() {
   enhancedBitFieldTests();
 }
 
+function testBigIntType() {
+  console.log('Testing BigInt Type');
+
+  const bigIntValue =  false ? 123456789123456789123456789123456789n : 32498573459823475984237593408275342908574239085742390854723590823475n;
+  const filePath = path.join(process.cwd(), 'bigInt.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+
+  // Writing BigInt
+  handler.bigInt(bigIntValue);
+  handler.jump(0);
+
+  // Reading BigInt
+  handler.bigInt('bigInt');
+  const readBigInt = handler.$('bigInt').value;
+
+  // Validate BigInt value
+  assertEqual(bigIntValue.toString(), readBigInt.toString(), 'BigInt value');
+
+  // Sign and verify the file
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+}
+
+function testBigIntInComplexStructures() {
+  console.log('Testing BigInt in Complex Structures');
+
+  const complexData = {
+    id: 987654321987654321987654321987654321n,
+    details: {
+      name: 'BigInt Test',
+      value: 123456789123456789123456789123456789n
+    },
+    happy: [
+      {first: 32498573459823475984237593408275342908574239085742390854723590823475n, 'second': 'hello'},
+      2345983753498574395834759834000034999912309944958734593487593408753490857349058342759824375n,
+      {hi: true},
+      {'nice': [1,2,3], 'big': 7395873425934759342857234908572349085742395084723590842375908234759048237542398n },
+      32498573459823475984237593408275342908574239085742390854723590823475n,
+    ]
+  };
+  const filePath = path.join(process.cwd(), 'bigIntComplex.bin');
+
+  const handler = new BinaryHandler();
+  handler.openFile(filePath);
+
+  // Writing complex data with BigInt
+  handler.pojo(complexData);
+  handler.jump(0);
+
+  // Reading complex data with BigInt
+  handler.pojo('complexData');
+  const readData = handler.$('complexData').value;
+
+  // Validate complex data with BigInt
+  assertEqual(complexData.id.toString(), readData.id.toString(), 'Complex BigInt ID');
+  assertEqual(complexData.details.name, readData.details.name, 'Complex BigInt Details Name');
+  assertEqual(complexData.details.value.toString(), readData.details.value.toString(), 'Complex BigInt Details Value');
+  assertEqual(complexData.happy[0].first.toString(), readData.happy[0].first.toString(), 'Complex BigInt Happy First');
+  assertEqual(complexData.happy[0].second, readData.happy[0].second, 'Complex BigInt Happy Second');
+  assertEqual(complexData.happy[1].toString(), readData.happy[1].toString(), 'Complex BigInt Happy Array:1(BigInt)');
+  assertEqual(complexData.happy[2].hi, readData.happy[2].hi, 'Complex BigInt Happy Hi');
+  assertEqual(complexData.happy[3].nice.toString(), readData.happy[3].nice.toString(), 'Complex BigInt Happy Nice Array:3(Array)');
+  assertEqual(complexData.happy[3].big.toString(), readData.happy[3].big.toString(), 'Complex BigInt Happy Big Array:4(BigInt)');
+  assertEqual(complexData.happy[4].toString(), readData.happy[4].toString(), 'Complex BigInt Happy Array:4(BigInt)');
+
+  // Sign and verify the file
+  handler.signFile('private.key');
+  if (!handler.verifyFile('public.key')) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+  cleanUp(filePath);
+}
+
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
@@ -1302,6 +1387,8 @@ function runTests() {
     testBinarySerialization();
     testRandomizedData();
     testAlphabetSoup();
+    testBigIntType();
+    testBigIntInComplexStructures();
   }
 
   cleanUp('private.key', true);

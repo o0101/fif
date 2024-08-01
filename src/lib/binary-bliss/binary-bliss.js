@@ -611,7 +611,11 @@ class BinaryHandler {
         return this;
       } else if (typeof keyOrValue === 'bigint') {
         this._alignToNextWrite();
-        const buffer = Buffer.from(keyOrValue.toString(16).padStart(2, '0'), 'hex');
+        let hex = keyOrValue.toString(16);
+        if (  hex.length & 1 ) {
+          hex = '0'+hex;
+        }
+        const buffer = Buffer.from(hex, 'hex');
         this.uint32(buffer.length);
         this._writeBytes(buffer);
         return this;
