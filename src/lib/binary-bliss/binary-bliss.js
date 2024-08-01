@@ -22,6 +22,13 @@ const BinaryType = {
   BUFFER: 8,
   BOOL: 9,
   BIGINT: 10,
+  INT8: 11,
+  UINT8: 12,
+  INT16: 13,
+  UINT16: 14,
+  INT32: 15,
+  UINT32: 16,
+  DOUBLE: 17,
 };
 
 class BinaryHandler {
@@ -830,8 +837,34 @@ class BinaryHandler {
         this.uint8(BinaryType.STRING); // Type flag for string
         this.puts(value);
       } else if (typeof value === 'number') {
-        this.uint8(BinaryType.FLOAT); // Type flag for float
-        this.float(value);
+        // Determine the appropriate type for the number
+        if (Number.isInteger(value)) {
+          if (value >= -128 && value <= 127) {
+            this.uint8(BinaryType.INT8);
+            this.int8(value);
+          } else if (value >= 0 && value <= 255) {
+            this.uint8(BinaryType.UINT8);
+            this.uint8(value);
+          } else if (value >= -32768 && value <= 32767) {
+            this.uint8(BinaryType.INT16);
+            this.int16(value);
+          } else if (value >= 0 && value <= 65535) {
+            this.uint8(BinaryType.UINT16);
+            this.uint16(value);
+          } else if (value >= -2147483648 && value <= 2147483647) {
+            this.uint8(BinaryType.INT32);
+            this.int32(value);
+          } else if (value >= 0 && value <= 4294967295) {
+            this.uint8(BinaryType.UINT32);
+            this.uint32(value);
+          } else {
+            this.uint8(BinaryType.DOUBLE); // Fallback to double for larger integers
+            this.double(value);
+          }
+        } else {
+          this.uint8(BinaryType.FLOAT); // Type flag for float
+          this.float(value);
+        }
       } else if (value instanceof Date) {
         this.uint8(BinaryType.DATE); // Type flag for date
         this.date(value);
@@ -899,6 +932,27 @@ class BinaryHandler {
           break;
         case BinaryType.BIGINT:
           value = this.bigInt(uniq).last.value;
+          break;
+        case BinaryType.INT8:
+          value = this.int8(uniq).last.value;
+          break;
+        case BinaryType.UINT8:
+          value = this.uint8(uniq).last.value;
+          break;
+        case BinaryType.INT16:
+          value = this.int16(uniq).last.value;
+          break;
+        case BinaryType.UINT16:
+          value = this.uint16(uniq).last.value;
+          break;
+        case BinaryType.INT32:
+          value = this.int32(uniq).last.value;
+          break;
+        case BinaryType.UINT32:
+          value = this.uint32(uniq).last.value;
+          break;
+        case BinaryType.DOUBLE:
+          value = this.double(uniq).last.value;
           break;
         default:
           throw new Error('Unknown type in _readTypeAndValue');

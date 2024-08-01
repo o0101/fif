@@ -1,6 +1,6 @@
 {
   "name": "binary-bliss",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "main": "binary-bliss.js",
   "module": "binary-bliss.js",
   "type": "module",
