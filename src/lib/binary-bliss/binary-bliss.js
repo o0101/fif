@@ -615,8 +615,6 @@ class BinaryHandler {
         const strLength = this.readLength();
         this._validateLength(strLength); // Validate the length
         const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
-        this._ensureBytes(5); // Read delimiter
-        const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
         this._ensureBytes(strLength);
         let value = this._readBytes(strLength, { decode: true });
         value = ATextDecoder.decode(value.buffer.slice(0, value.length));
