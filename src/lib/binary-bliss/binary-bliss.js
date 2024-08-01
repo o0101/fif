@@ -600,7 +600,7 @@ class BinaryHandler {
     }
 
     // String get 
-    gets(keyOrValue, len = null, encoding = 'utf8', delimiter = null) {
+    gets(keyOrValue, len = null, encoding = 'utf8') {
       this._alignToNextRead();
       const key = keyOrValue;
       if (len !== null) {
@@ -611,10 +611,9 @@ class BinaryHandler {
         this.reading.push({ key, value, type: 'string' });
       } else {
         // Read metadata
-        this._ensureBytes(4); // Read length
-        const strLength = this._readBytes(4).readUInt32BE(0);
+        this._ensureBytes(6); // Ensure enough for length and str encoding
+        const strLength = this.readLength();
         this._validateLength(strLength); // Validate the length
-        this._ensureBytes(5); // Read encoding
         const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
         this._ensureBytes(5); // Read delimiter
         const strDelimiter = this._readBytes(5).toString('utf8').replace(/\0/g, '');
@@ -627,7 +626,7 @@ class BinaryHandler {
     }
 
     // String put
-    puts(value, len = null, encoding = 'utf8', delimiter = null) {
+    puts(value, len = null, encoding = 'utf8') {
       this._alignToNextWrite();
       let buffer;
 
@@ -635,15 +634,13 @@ class BinaryHandler {
       if (len === null) {
         // Non-fixed length string with metadata
         buffer = Buffer.from(encodedValue, encoding);
-        const metaLength = Buffer.alloc(4);
-        metaLength.writeUInt32BE(buffer.length, 0);
+        this.writeLength(buffer.length);
         const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
-        const metaDelimiter = delimiter ? Buffer.from(delimiter.padEnd(5, '\0'), 'utf8') : Buffer.alloc(5, '\0'); // Fixed length for delimiter
         if (ETEXT) {
           BinaryUtils.encode(metaEncoding);
           BinaryUtils.encode(buffer);
         }
-        this._writeBytes(Buffer.concat([metaLength, metaEncoding, metaDelimiter, buffer]));
+        this._writeBytes(Buffer.concat([metaEncoding, buffer]));
       } else {
         // Fixed length string
         this._validateLength(len); // Validate the length
