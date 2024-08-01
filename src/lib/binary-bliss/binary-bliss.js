@@ -21,6 +21,7 @@ const BinaryType = {
   SET: 7,
   BUFFER: 8,
   BOOL: 9,
+  BIGINT: 10,
 };
 
 class BinaryHandler {
@@ -46,7 +47,7 @@ class BinaryHandler {
   }
 
   _alignToNextRead() {
-    if ( this.bitCursor > 0 ) {
+    if (this.bitCursor > 0) {
       this.bitCursor = 0;
       this._buffer = Buffer.alloc(0);
     }
@@ -119,7 +120,7 @@ class BinaryHandler {
       const { value, bitOffset } = this.readBits(length, this._buffer, this.bitCursor);
       this.reading.push({ key: keyOrValue, value, type: `bit_${length}` });
       this.bitCursor = bitOffset;
-      if ( bitOffset == 0 ) {
+      if (bitOffset == 0) {
         this._buffer = Buffer.alloc(0);
       } else {
         this._buffer = this._buffer.slice(-1);
@@ -135,7 +136,7 @@ class BinaryHandler {
       }
       const { buffer, bitOffset } = this.writeBits(length, value, this._buffer, this.bitCursor);
       this.bitCursor = bitOffset;
-      if ( bitOffset == 0 ) {
+      if (bitOffset == 0) {
         // all bits used, carry forward nothing
         this._writeBytes(buffer);
         DEBUG && console.log(`Wrote ${buffer.length} bytes`);
@@ -143,8 +144,8 @@ class BinaryHandler {
       } else {
         // carry forward the partial unused bits
         this._buffer = buffer.slice(-1);
-        DEBUG && console.log(`Carried 1 bytes and wrote ${buffer.length-1} bytes`);
-        this._writeBytes(buffer.slice(0,-1));
+        DEBUG && console.log(`Carried 1 bytes and wrote ${buffer.length - 1} bytes`);
+        this._writeBytes(buffer.slice(0, -1));
       }
 
       DEBUG && console.log(`Write operation: buffer=${buffer.toString('hex')}, bitCursor=${this.bitCursor}`);
@@ -277,7 +278,7 @@ class BinaryHandler {
   }
 
   _alignToNextWrite() {
-    if ( this._buffer.length ) {
+    if (this._buffer.length) {
       this._writeBytes(this._buffer);
       this._buffer = Buffer.alloc(0);
       this.bitCursor = 0;
@@ -286,7 +287,7 @@ class BinaryHandler {
 
   signFile(privateKeyPath) {
     // Read the private key
-    if ( ! existsSync(privateKeyPath) || ! existsSync(this.filePath) ) {
+    if (!existsSync(privateKeyPath) || !existsSync(this.filePath)) {
       throw new Error(`Both private key (${privateKeyPath}) and file (${this.filePath}) must exist.`);
     }
     const privateKey = Buffer.from(readFileSync(privateKeyPath, 'utf8'), 'hex');
@@ -304,7 +305,7 @@ class BinaryHandler {
 
   verifyFile(publicKeyPath) {
     // Read the public key
-    if ( ! existsSync(publicKeyPath) || ! existsSync(this.filePath) ) {
+    if (!existsSync(publicKeyPath) || !existsSync(this.filePath)) {
       throw new Error(`Both public key (${publicKeyPath}) and file (${this.filePath}) must exist.`);
     }
     const publicKey = Buffer.from(readFileSync(publicKeyPath, 'utf8'), 'hex');
@@ -403,6 +404,9 @@ class BinaryHandler {
     } else if (typeof value === 'boolean') {
       this.uint8(BinaryType.BOOL); // Type flag for bool
       this.bool(value);
+    } else if (typeof value === 'bigint') {
+      this.uint8(BinaryType.BIGINT); // Type flag for bigint
+      this.bigInt(value);
     } else {
       console.error(`Unsupported value`, value);
       throw new Error('Unsupported type for _writeTypeAndValue');
@@ -444,10 +448,35 @@ class BinaryHandler {
       case BinaryType.BOOL:
         value = this.bool(uniq).last.value;
         break;
+      case BinaryType.BIGINT:
+        value = this.bigInt(uniq).last.value;
+        break;
       default:
         throw new Error('Unknown type in _readTypeAndValue');
     }
     return value;
+  }
+
+  bigInt(keyOrValue) {
+    if (typeof keyOrValue === 'string') {
+      this._alignToNextRead();
+      const key = keyOrValue;
+      const length = this.uint32('length').last.value;
+      this._validateLength(length);
+      this._ensureBytes(length);
+      const buffer = this._readBytes(length);
+      const value = BigInt('0x' + buffer.toString('hex'));
+      this.reading.push({ key, value, type: 'bigint' });
+      return this;
+    } else if (typeof keyOrValue === 'bigint') {
+      this._alignToNextWrite();
+      const buffer = Buffer.from(keyOrValue.toString(16).padStart(2, '0'), 'hex');
+      this.uint32(buffer.length);
+      this._writeBytes(buffer);
+      return this;
+    } else {
+      throw new Error('Invalid argument for bigInt method');
+    }
   }
 
   int8(keyOrValue) {
@@ -634,16 +663,6 @@ class BinaryHandler {
       this._writeBytes(buffer);
       return this;
     }
-  }
-
-  jump(cursorPosition) {
-    if ( this._buffer.length ) {
-      this._writeBytes(this._buffer);
-      this._buffer = Buffer.alloc(0);
-    }
-    this.cursor = cursorPosition;
-    this.bitCursor = 0;
-    return this;
   }
 
   gets(keyOrValue, len = null, encoding = 'utf8', delimiter = null) {
@@ -918,22 +937,6 @@ class BinaryHandler {
     return this;
   }
 
-  read() {
-    const result = {};
-    for (const { key, value, type } of this.reading) {
-      result[key] = { value, type };
-    }
-    return result;
-  }
-
-  get last() {
-    return this.reading.length ? this.reading[this.reading.length - 1] : null;
-  }
-
-  $(searchKey) {
-    return this.reading.findLast(item => item.key === searchKey) || null;
-  }
-
   readTranscript(format) {
     const result = [];
     this.jump(0);
@@ -1039,28 +1042,6 @@ const BinaryUtils = {
 
     return buffer;
   }
-
-  /*
-  encode(buf) {
-    if ( buf.length == 0 ) return buf;
-
-    for( let i = 0; i < buf.length; i++ ) {
-      buf[i] ^= 123;
-    }
-
-    return buf;
-  },
-
-  decode(buf) {
-    if ( buf.length == 0 ) return buf;
-
-    for( let i = 0; i < buf.length; i++ ) {
-      buf[i] ^= 123;
-    }
-
-    return buf;
-  }
-  */
 };
 
 export { BinaryHandler, BinaryTypes, BinaryUtils, BinaryType };
