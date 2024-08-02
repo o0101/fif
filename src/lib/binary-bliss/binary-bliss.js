@@ -72,7 +72,8 @@ class BinaryHandler {
       try {
         if (!existsSync(safePath)) {
           // Open for writing and reading if not exist
-          this.fd = openSync(safePath, 'w+', mode);
+          flag = 'w+';
+          this.fd = openSync(safePath, flag, mode);
         } else {
           const stats = statSync(safePath);
 
