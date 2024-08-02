@@ -67,6 +67,7 @@ class BinaryHandler {
 
     openFile(filePath, { append = false, mode = 0o666 } = {}) {
       const safePath = path.resolve(filePath);
+      let flag;
 
       try {
         if (!existsSync(safePath)) {
@@ -97,7 +98,6 @@ class BinaryHandler {
           }
 
           // Determine the appropriate flags based on readability and writability
-          let flag;
           if (isWritable && isReadable) {
             flag = append ? 'a+' : 'r+';
           } else if (isWritable) {
@@ -110,6 +110,11 @@ class BinaryHandler {
         }
 
         this.filePath = filePath;
+
+        if ( append && flag.startsWith('a') ) {
+          this.jumpEnd();
+        }
+
         DEBUG && console.log(`File opened: ${safePath} (${flag}) - ${mode}, fd=${this.fd}`);
         return this;
       } catch (err) {
@@ -135,6 +140,8 @@ class BinaryHandler {
         try {
           closeSync(this.fd);
           this.fd = null;
+          this.cursor = 0;
+          this.bitCursor = 0;
           DEBUG && console.log(`File closed: ${this.filePath}`);
         } catch (err) {
           console.error(`Error closing file: ${this.filePath}`, err);
@@ -162,7 +169,7 @@ class BinaryHandler {
       }
       const stats = fstatSync(this.fd);
       if (this.cursor + length > stats.size) {
-        throw new Error('Insufficient data in file');
+        throw new Error('Insufficient data in file: ' + this.filePath);
       }
     }
 
@@ -295,6 +302,20 @@ class BinaryHandler {
       return this;
     }
 
+    jumpEnd() {
+      if ( ! this.fd ) {
+        throw new Error(`No open file to jump to the end of.`);
+      } 
+      if (this._buffer.length) {
+        this._writeBytes(this._buffer);
+        DEBUG && console.log(`Wrote ${this._buffer.length} bytes at jump to ${cursorPosition}.`);
+        this._buffer = Buffer.alloc(0);
+      }
+      const {size} = fstatSync(this.fd);
+      this.cursor = size;
+      this.bitCursor = 0;
+    }
+
     _alignToNextRead() {
       if (this.bitCursor > 0) {
         this.bitCursor = 0;
@@ -316,7 +337,7 @@ class BinaryHandler {
         this._validateLength(length);
         const stats = fstatSync(this.fd);
         if (this.cursor + length > stats.size) {
-          throw new Error('Insufficient data in file');
+          throw new Error('Insufficient data in file: ' + this.filePath);
         }
 
         const buffer = Buffer.alloc(length);

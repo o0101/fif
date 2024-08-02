@@ -1,5 +1,5 @@
 import path from 'path';
-import { unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
+import { statSync, unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
 import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
@@ -1355,6 +1355,39 @@ function testBigIntInComplexStructures() {
   cleanUp(filePath);
 }
 
+function testJumpEnd() {
+  console.log('Testing Jump End');
+
+  const filePath = path.join(process.cwd(), 'jump_end_test.bin');
+
+  // Step 1: Create and write initial data to the file
+  const initialData = 'Hello, World!';
+  const handler = new BinaryHandler();
+  handler.openFile(filePath, { append: false });
+  handler.buffer(Buffer.from(initialData)); // Write initial data
+  handler.closeFile();
+
+  // Step 2: Reopen the file in append mode and jump to the end
+  handler.openFile(filePath, { append: true });
+  // if append is true and the file was able to be opened for appending, 
+  // then openFile will automatically jump to end
+
+  // Step 3: Write additional data
+  const additionalData = ' More data here!';
+  handler.buffer(Buffer.from(additionalData));
+  handler.closeFile();
+
+
+  // Step 4: Verify the file content
+  const expectedContent = initialData + additionalData;
+  handler.openFile(filePath);
+  const buf1 = handler.buffer().last.value;
+  const buf2 = handler.buffer().last.value;
+  const actual = Buffer.concat([buf1, buf2]);
+  const actualContent = actual.toString();
+  assertEqual(expectedContent, actualContent, 'Jump to end and append data');
+}
+
 function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
@@ -1389,6 +1422,7 @@ function runTests() {
     testAlphabetSoup();
     testBigIntType();
     testBigIntInComplexStructures();
+    testJumpEnd();
   }
 
   cleanUp('private.key', true);
