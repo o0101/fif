@@ -1,4 +1,8 @@
-import { openSync, readSync, writeSync, closeSync, fstatSync, statSync, existsSync, readFileSync, appendFileSync } from 'fs';
+import { 
+  accessSync, constants, openSync, readSync, writeSync, 
+  closeSync, fstatSync, statSync, existsSync, readFileSync, 
+  appendFileSync 
+} from 'fs';
 import { Buffer } from 'buffer';
 import path from 'path';
 import zlib from 'zlib';
@@ -61,18 +65,65 @@ class BinaryHandler {
       this.fd = null;
     }
 
-    openFile(filePath) {
+    openFile(filePath, { append = false, mode = 0o666 } = {}) {
       const safePath = path.resolve(filePath);
-      if (!existsSync(safePath)) {
-        this.fd = openSync(safePath, 'w+');
-      } else {
-        const stats = statSync(safePath);
-        const isWritable = (stats.mode & 0o200) !== 0;
-        this.fd = openSync(safePath, isWritable ? 'r+' : 'r');
+
+      try {
+        if (!existsSync(safePath)) {
+          // Open for writing and reading if not exist
+          this.fd = openSync(safePath, 'w+', mode);
+        } else {
+          const stats = statSync(safePath);
+
+          if (!stats.isFile()) {
+            throw new Error(`${safePath} is not a file`);
+          }
+
+          let isWritable;
+          let isReadable;
+
+          try {
+            accessSync(safePath, constants.W_OK);
+            isWritable = true;
+          } catch (err) {
+            isWritable = false;
+          }
+
+          try {
+            accessSync(safePath, constants.R_OK);
+            isReadable = true;
+          } catch (err) {
+            isReadable = false;
+          }
+
+          // Determine the appropriate flags based on readability and writability
+          let flag;
+          if (isWritable && isReadable) {
+            flag = append ? 'a+' : 'r+';
+          } else if (isWritable) {
+            flag = append ? 'a' : 'w';
+          } else {
+            flag = 'r';
+          }
+
+          this.fd = openSync(safePath, flag, mode);
+        }
+
+        this.filePath = filePath;
+        DEBUG && console.log(`File opened: ${safePath} (${flag}) - ${mode}, fd=${this.fd}`);
+        return this;
+      } catch (err) {
+        if (err.code === 'EACCES') {
+          console.error(`Permission denied: ${safePath}`);
+        } else if (err.code === 'ENOENT') {
+          console.error(`File not found: ${safePath}`);
+        } else if (err.code === 'EISDIR') {
+          console.error(`Is a directory: ${safePath}`);
+        } else {
+          console.error(`Error opening file: ${safePath}`, err);
+        }
+        throw err;
       }
-      this.filePath = filePath;
-      DEBUG && console.log(`File opened: ${this.filePath}, fd=${this.fd}`);
-      return this;
     }
 
     closeFile() {
@@ -81,10 +132,14 @@ class BinaryHandler {
         this._buffer = Buffer.alloc(0);
       }
       if (this.fd !== null) {
-        closeSync(this.fd);
-        this.fd = null;
+        try {
+          closeSync(this.fd);
+          this.fd = null;
+          DEBUG && console.log(`File closed: ${this.filePath}`);
+        } catch (err) {
+          console.error(`Error closing file: ${this.filePath}`, err);
+        }
       }
-      DEBUG && console.log(`File closed: ${this.filePath}`);
       return this;
     }
 
