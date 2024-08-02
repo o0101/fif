@@ -31,6 +31,25 @@ const BinaryType = {
   DOUBLE: 17,
 };
 
+const EncodingType = {
+  'utf8': 1,
+  'utf16le': 2,
+  'latin1': 3,
+  'base64': 4,
+  'base64url': 5,
+  'hex': 6,
+  'ascii': 7,
+  'binary': 8, // Alias for 'latin1'
+  'ucs2': 9 // Alias of 'utf16le'
+};
+
+const EncodingMap = {};
+
+Object.entries(EncodingType).forEach(([key, value]) => {
+  EncodingMap[key] = value;
+  EncodingMap[value] = key;
+});
+
 class BinaryHandler {
   // Init, config, file access, and checks
     constructor(endian = 'BE') {
@@ -379,11 +398,12 @@ class BinaryHandler {
 
   // Primitive types
     bool(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         // Read mode
         const buy = this.bit(1, keyOrValue).last;
-        buy.value = buy.value ? true : false;
-        buy.type = 'bool';
+        const value = buy.value ? true : false;
+        const type = 'bool';
+        this.reading.push({ key: keyOrValue || 'bool', value, type });
         return this;
       } else {
         // Write mode
@@ -392,12 +412,12 @@ class BinaryHandler {
     }
 
     int8(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(1);
         const buffer = this._readBytes(1);
         const value = buffer.readInt8(0);
-        this.reading.push({ key: keyOrValue, value, type: 'int8' });
+        this.reading.push({ key: keyOrValue || 'int8', value, type: 'int8' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -410,12 +430,12 @@ class BinaryHandler {
     }
 
     uint8(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(1);
         const buffer = this._readBytes(1);
         const value = buffer.readUInt8(0);
-        this.reading.push({ key: keyOrValue, value, type: 'uint8' });
+        this.reading.push({ key: keyOrValue || 'uint8', value, type: 'uint8' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -428,12 +448,12 @@ class BinaryHandler {
     }
 
     int16(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(2);
         const buffer = this._readBytes(2);
         const value = this.endian === 'BE' ? buffer.readInt16BE(0) : buffer.readInt16LE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'int16' });
+        this.reading.push({ key: keyOrValue || 'int16', value, type: 'int16' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -450,12 +470,12 @@ class BinaryHandler {
     }
 
     uint16(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(2);
         const buffer = this._readBytes(2);
         const value = this.endian === 'BE' ? buffer.readUInt16BE(0) : buffer.readUInt16LE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'uint16' });
+        this.reading.push({ key: keyOrValue || 'uint16', value, type: 'uint16' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -472,12 +492,12 @@ class BinaryHandler {
     }
 
     int32(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(4);
         const buffer = this._readBytes(4);
         const value = this.endian === 'BE' ? buffer.readInt32BE(0) : buffer.readInt32LE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'int32' });
+        this.reading.push({ key: keyOrValue || 'int32', value, type: 'int32' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -494,12 +514,12 @@ class BinaryHandler {
     }
 
     uint32(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(4);
         const buffer = this._readBytes(4);
         const value = this.endian === 'BE' ? buffer.readUInt32BE(0) : buffer.readUInt32LE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'uint32' });
+        this.reading.push({ key: keyOrValue || 'uint32', value, type: 'uint32' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -516,12 +536,12 @@ class BinaryHandler {
     }
 
     float(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(4);
         const buffer = this._readBytes(4);
         const value = this.endian === 'BE' ? buffer.readFloatBE(0) : buffer.readFloatLE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'float' });
+        this.reading.push({ key: keyOrValue || 'float', value, type: 'float' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -538,12 +558,12 @@ class BinaryHandler {
     }
 
     double(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(8);
         const buffer = this._readBytes(8);
         const value = this.endian === 'BE' ? buffer.readDoubleBE(0) : buffer.readDoubleLE(0);
-        this.reading.push({ key: keyOrValue, value, type: 'double' });
+        this.reading.push({ key: keyOrValue || 'double', value, type: 'double' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -560,9 +580,9 @@ class BinaryHandler {
     }
 
     buffer(keyOrBuffer) {
-      if (typeof keyOrBuffer === 'string') {
+      if (typeof keyOrBuffer === 'string' || keyOrBuffer === undefined) {
         this._alignToNextRead();
-        const key = keyOrBuffer;
+        const key = keyOrBuffer || 'buffer';
         const length = this.readLength();
         this._validateLength(length);
         this._ensureBytes(length);
@@ -582,12 +602,12 @@ class BinaryHandler {
     }
 
     date(keyOrValue) {
-      if (typeof keyOrValue === 'string') {
+      if (typeof keyOrValue === 'string' || keyOrValue === undefined) {
         this._alignToNextRead();
         this._ensureBytes(8);
         const buffer = this._readBytes(8);
         const value = new Date(Number(buffer.readBigUInt64BE(0)));
-        this.reading.push({ key: keyOrValue, value, type: 'date' });
+        this.reading.push({ key: keyOrValue || 'date', value, type: 'date' });
         return this;
       } else {
         this._alignToNextWrite();
@@ -602,22 +622,33 @@ class BinaryHandler {
     // String get 
     gets(keyOrValue, len = null, encoding = 'utf8') {
       this._alignToNextRead();
-      const key = keyOrValue;
+      const key = keyOrValue || 'string';
       if (len !== null) {
         this._validateLength(len); // Validate the length
         this._ensureBytes(len);
-        let value = this._readBytes(len, { decode: true }).toString(encoding);
+        let value = this._readBytes(len, { decode: ETEXT }).toString(encoding);
         value = ATextDecoder.decode(value.buffer.slice(0, value.length));
         this.reading.push({ key, value, type: 'string' });
       } else {
         // Read metadata
-        this._ensureBytes(6); // Ensure enough for length and str encoding
+        this._ensureBytes(2); // Ensure enough for length and encoding
+        const encodingType = this.uint8().last.value;
+
+        encoding = EncodingMap[encodingType];
+        if (encoding === undefined) {
+          throw new Error(`Unsupported encoding type: ${encodingType}`);
+        }
+
         const strLength = this.readLength();
         this._validateLength(strLength); // Validate the length
-        const strEncoding = ETEXT ? BinaryUtils.decode(this._readBytes(5)).toString('utf8').replace(/\0/g, '') : this._readBytes(5).toString('utf8').replace(/\0/g, '');
         this._ensureBytes(strLength);
-        let value = this._readBytes(strLength, { decode: true });
-        value = ATextDecoder.decode(value.buffer.slice(0, value.length));
+        let value;
+        if (encoding === 'binary') {
+          value = this._readBytes(strLength).toString('latin1');
+        } else {
+          value = this._readBytes(strLength, { decode: ETEXT });
+          value = ATextDecoder.decode(value.buffer.slice(0, value.length));
+        }
         this.reading.push({ key, value, type: 'string' });
       }
       return this;
@@ -628,24 +659,33 @@ class BinaryHandler {
       this._alignToNextWrite();
       let buffer;
 
-      const encodedValue = ATextEncoder.encode(value);
+      if (encoding === 'binary') {
+        buffer = Buffer.from(value, 'latin1');
+      } else {
+        const encodedValue = ATextEncoder.encode(value);
+        buffer = Buffer.from(encodedValue, encoding);
+      }
+
       if (len === null) {
         // Non-fixed length string with metadata
-        buffer = Buffer.from(encodedValue, encoding);
+
+        const encodingType = EncodingMap[encoding];
+        if (encodingType === undefined) {
+          throw new Error(`Unsupported encoding: ${encoding}`);
+        }
+        this.uint8(encodingType); // Write encoding type as integer
+
         this.writeLength(buffer.length);
-        const metaEncoding = Buffer.from(encoding.padEnd(5, '\0'), 'utf8'); // Fixed length for encoding
         if (ETEXT) {
-          BinaryUtils.encode(metaEncoding);
           BinaryUtils.encode(buffer);
         }
-        this._writeBytes(Buffer.concat([metaEncoding, buffer]));
+        this._writeBytes(buffer);
       } else {
         // Fixed length string
         this._validateLength(len); // Validate the length
         buffer = Buffer.alloc(len);
         buffer.write(value, 0, len, encoding);
-        console.log('encode', buffer);
-        this._writeBytes(buffer, { encode: true });
+        this._writeBytes(buffer, { encode: ETEXT });
       }
       return this;
     }
@@ -691,7 +731,7 @@ class BinaryHandler {
         return this;
       } else {
         this._alignToNextRead();
-        const key = keyOrValue;
+        const key = keyOrValue || 'array';
         const values = [];
         for (let i = 0; i < length; i++) {
           this[type](`value_${i}`);
@@ -716,7 +756,7 @@ class BinaryHandler {
         return this;
       } else {
         this._alignToNextRead();
-        const key = keyOrValue;
+        const key = keyOrValue || 'heteroArray';
         const values = [];
         const length = this.readLength();
         for (let i = 0; i < length; i++) {
@@ -740,7 +780,7 @@ class BinaryHandler {
         return this;
       } else {
         this._alignToNextRead();
-        const key = keyOrValue;
+        const key = keyOrValue || 'map';
         const map = new Map();
         const length = this.readLength();
         for (let i = 0; i < length; i++) {
@@ -765,7 +805,7 @@ class BinaryHandler {
         return this;
       } else {
         this._alignToNextRead();
-        const key = keyOrValue;
+        const key = keyOrValue || 'set';
         const set = new Set();
         const length = this.readLength();
         for (let i = 0; i < length; i++) {
@@ -790,7 +830,7 @@ class BinaryHandler {
         return this;
       } else {
         this._alignToNextRead();
-        const key = keyOrValue;
+        const key = keyOrValue || 'pojo';
         const obj = {};
         const length = this.readLength();
         for (let i = 0; i < length; i++) {
@@ -950,7 +990,7 @@ class BinaryHandler {
           value = this.double(uniq).last.value;
           break;
         default:
-          throw new Error('Unknown type in _readTypeAndValue');
+          throw new Error('Unknown type in _readTypeAndValue: ' + type);
       }
       return value;
     }
@@ -966,10 +1006,10 @@ class BinaryHandler {
 
     // gzip types is a compressed string or buffer type (for example, embedded file content)
     gzip(options) {
-      if (typeof options === 'string') {
+      if (typeof options === 'string' || options === undefined) {
         this._alignToNextRead();
         // Reading and decompressing
-        const key = options;
+        const key = options || 'gzip';
         this._ensureBytes(1); // Read type
         const type = this._readBytes(1).readUInt8(0);
         this._ensureBytes(4); // Read length

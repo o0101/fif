@@ -1367,7 +1367,6 @@ function runTests() {
     testMagicNumber();
     testMagicString();
     testMagicBuffer();
-    testMapType();
     testHeteroArray();
     testNestedArray();
     testDateType();
@@ -1377,6 +1376,7 @@ function runTests() {
     testComplexNonLatinObject();
     testMapWithPojo();
     testPojoWithMap();
+    testMapType();
     testSetType();
     testSetWithPojo();
     testPojoWithSet();
