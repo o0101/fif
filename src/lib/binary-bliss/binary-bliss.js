@@ -317,6 +317,14 @@ class BinaryHandler {
       this.bitCursor = 0;
     }
 
+    isEOF() {
+      if ( this.fd ) {
+        const {size} = fstatSync(this.fd);
+        if ( this.cursor < size ) return false;
+      }
+      return true;
+    }
+
     _alignToNextRead() {
       if (this.bitCursor > 0) {
         this.bitCursor = 0;
