@@ -14,6 +14,8 @@ const ETEXT = true;
 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 const DEBUG = false;
+// 32-bit register for bit operations that will not result in signed integers
+const R32 = new Uint32Array(1);
 
 const BinaryType = {
   STRING: 1,
@@ -258,7 +260,9 @@ class BinaryHandler {
         buffer.writeUIntBE(length | 0x800000, 0, 3);
       } else { // 11 - 4 bytes
         buffer = Buffer.alloc(4);
-        buffer.writeUInt32BE(length | 0xC0000000, 0);
+        R32[0] = length;
+        R32[0] |= 0xc0000000;
+        buffer.writeUInt32BE(R32[0], 0);
       }
       this._writeBytes(buffer);
     }
@@ -280,12 +284,14 @@ class BinaryHandler {
         buffer[2] = this._readBytes(1).readUInt8(0);
         length = ((buffer.readUIntBE(0,3) & 0x3FFFFF));
       } else { // 11
-        const buffer = Buffer.alloc(3);
+        const buffer = Buffer.alloc(4);
         buffer[0] = firstByte;
         buffer[1] = this._readBytes(1).readUInt8(0);
         buffer[2] = this._readBytes(1).readUInt8(0);
         buffer[3] = this._readBytes(1).readUInt8(0);
-        length = ((buffer.readUInt32BE(0, 3) & 0x3FFFFFFF));
+        R32[0] = buffer.readUInt32BE(0);
+        R32[0] &= 0x3fffffff;
+        length = R32[0];
       }
       return length;
     }

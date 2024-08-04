@@ -23,6 +23,7 @@ function benchmarkWrite(filePath, data) {
   const handler = new BinaryHandler();
   handler.openFile(filePath);
   const start = process.hrtime();
+  console.log(data.length);
   handler.buffer(data);  // Writing data
   const end = process.hrtime(start);
   handler.closeFile();
