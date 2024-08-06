@@ -6,7 +6,7 @@ import * as eddsa from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 eddsa.etc.sha512Sync = (...m) => sha512(eddsa.etc.concatBytes(...m));
 
-const LARGE = true;
+const LARGE = false;
 const BIT_ONLY = false;
 const greenCheck = '\x1b[32m✓\x1b[0m';
 const redCross = '\x1b[31m✗\x1b[0m';
@@ -26,10 +26,10 @@ runTests();
     if (BIT_ONLY) {
       bitTests();
     } else {
-      //await testHardenedPojo();
-      //await testHardenedBuffer();
-      //await testHardenedString();
-      //await testPojoWithNestedHardenedFields();
+      await testHardenedPojo();
+      await testHardenedBuffer();
+      await testHardenedString();
+      await testPojoWithNestedHardenedFields();
       //await testHPojoWithNestedHardenedFields();
       testColorType();
       bitTests();
@@ -1534,7 +1534,7 @@ runTests();
   }
 
   async function testHPojoWithNestedHardenedFields() {
-    console.log('Testing POJO With Nested Hardened Fields Type');
+    console.log('Testing HPOJO With Nested Hardened Fields Type');
 
     const pojo = {
       [BinaryHandler.hard]: true,

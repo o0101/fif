@@ -914,7 +914,7 @@ class BinaryHandler {
         this.noFile = false;
       }
 
-      const encryptedBuffer = crypto.publicEncrypt(this.publicKey, stringBuffer);
+      const encryptedBuffer = rsaEncrypt(this.publicKey, stringBuffer);
       this.buffer(encryptedBuffer);
       return this;
     }
@@ -926,8 +926,8 @@ class BinaryHandler {
       
       this._alignToNextRead();
       const encryptedBuffer = this.buffer().last.value;
-      console.log({encryptedBuffer, key, pK: this.privateKey, r: this.reading});
-      const decryptedBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+      DEBUG && console.log({encryptedBuffer, key, pK: this.privateKey, r: this.reading});
+      const decryptedBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
       let originalString;
       {//no file block
         this.noFile = true;
@@ -963,8 +963,8 @@ class BinaryHandler {
           this.noFile = false;
         }
 
-        console.log({pk: this.publicKey, pojoBuffer});
-        const encryptedBuffer = crypto.publicEncrypt(this.publicKey, pojoBuffer);
+        DEBUG && console.log({pk: this.publicKey, pojoBuffer});
+        const encryptedBuffer = rsaEncrypt(this.publicKey, pojoBuffer);
         this.buffer(encryptedBuffer);
         return this;
       } else {
@@ -973,12 +973,12 @@ class BinaryHandler {
         }
         this._alignToNextRead();
         const encryptedBuffer = this.buffer().last.value
-        const originalBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+        const originalBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
         let originalObject;
         {//no file block
           this.noFile = true;
           this._alignToNextRead();
-          this.noFileBuffer = originalBuffer;
+          this.noFileBuffer = Buffer.concat([this.noFileBuffer, originalBuffer]);
           originalObject = this.pojo().last.value;
           DEBUG && console.log({originalObject, encryptedBuffer, tos: encryptedBuffer.toString()});
           this.noFile = false;
@@ -1024,7 +1024,7 @@ class BinaryHandler {
         {//no file block
           this.noFile = true;
           this._alignToNextRead();
-          this.noFileBuffer = originalBuffer;
+          this.noFileBuffer = Buffer.concat([this.noFileBuffer, originalBuffer]);
           plainBuffer = this.buffer().last.value;
           DEBUG && console.log({plainBuffer, originalBuffer, encryptedBuffer});
           this.noFile = false;
@@ -1252,7 +1252,7 @@ class BinaryHandler {
       } else if (typeof value === 'object' && value !== null) {
         if ( value[this.constructor.hard] ) {
           this.uint8(BinaryType.HPOJO);
-          console.log({value});
+          DEBUG && console.log({value});
           this.hpojo(value);
         } else {
           this.uint8(BinaryType.POJO);
@@ -1492,11 +1492,10 @@ class BinaryHandler {
   // Function to encrypt data in chunks using RSA with OAEP padding
   function rsaEncrypt(publicKey, data) {
     const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
-    const padding = crypto.constants.RSA_PKCS1_OAEP_PADDING;
-    const chunkSize = keySize - 42; // Adjust according to the padding
 
-    const chunks = chunkData(data, chunkSize);
-    const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt({ key: publicKey, padding }, chunk));
+    const chunks = chunkData(data, keySize);
+    const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt(publicKey, chunk));
+    DEBUG && console.log(encryptedChunks.map(chunk => chunk.length));
 
     return Buffer.concat(encryptedChunks);
   }
@@ -1504,10 +1503,11 @@ class BinaryHandler {
   // Function to decrypt data in chunks using RSA with OAEP padding
   function rsaDecrypt(privateKey, encryptedData) {
     const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
-    const padding = crypto.constants.RSA_PKCS1_OAEP_PADDING;
 
-    const chunks = chunkData(encryptedData, keySize);
-    const decryptedChunks = chunks.map(chunk => crypto.privateDecrypt({ key: privateKey, padding }, chunk));
+    const chunks = chunkData(encryptedData, 384);
+    const decryptedChunks = chunks.map(chunk => {
+      return crypto.privateDecrypt(privateKey, chunk);
+    });
 
     return Buffer.concat(decryptedChunks);
   }
