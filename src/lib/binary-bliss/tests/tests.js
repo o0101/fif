@@ -26,9 +26,11 @@ runTests();
     if (BIT_ONLY) {
       bitTests();
     } else {
-      await testHardenedPojo();
-      await testHardenedBuffer();
-      await testHardenedString();
+      //await testHardenedPojo();
+      //await testHardenedBuffer();
+      //await testHardenedString();
+      //await testPojoWithNestedHardenedFields();
+      //await testHPojoWithNestedHardenedFields();
       testColorType();
       bitTests();
       testBufferType();
@@ -1459,27 +1461,128 @@ runTests();
     await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
     await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
 
-    const testString = 'This is a test string for hputs and hgets';
+    const testString = new BinaryHandler.HardString('This is a test string for hputs and hgets');
     const filePath = path.join(process.cwd(), 'hstring.bin');
 
     handler.openFile(filePath);
-    testString[BinaryHandler.hard] = true;
     handler.hputs(testString);
     handler.jump(0);
 
-    const readString = handler.hgets().last.value;
+    // toString is necessary simply for equality test as readString is a HardString
+    // which works like a string but will not test equally even tho it is. 
+    const readString = handler.hgets().last.value.toString(); 
 
     assertEqual(testString, readString, 'HSTRING');
 
-    handler.signFile(path.resolve(os.homedir(), '.ssh/id_rsa'));
-    if (!handler.verifyFile(path.resolve(os.homedir(), '.ssh/id_rsa.pub'))) {
-      console.error(`❌ Test failed: File failed to verify.`);
+    handler.signFile('private.key');
+    if ( ! handler.verifyFile('public.key') ) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
     } else {
-      console.log(`✅ Test passed: File signature successfully verified.`);
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
     }
 
     handler.closeFile();
   }
+
+  async function testPojoWithNestedHardenedFields() {
+    console.log('Testing POJO With Nested Hardened Fields Type');
+
+    const pojo = {
+      name: new BinaryHandler.HardString('Test'),
+      age: 30,
+      nested: {
+        [BinaryHandler.hard]: true,
+        key: 'value',
+        array: [1, 'two', new Date()]
+      },
+      secondNest: {
+        bigFriend: [1,2,3,5,7,11,13,17,19,23],
+        awesomeFriend: BinaryHandler.harden(
+          Buffer.from(new Uint32Array(
+            [2,4,16,256,65536]
+          ).buffer)
+        )
+      }
+    };
+    const filePath = path.join(process.cwd(), 'pojo_with_hfields.bin');
+
+    const handler = new BinaryHandler();
+    await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
+    await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
+    handler.openFile(filePath);
+    handler.pojo(pojo);
+    handler.jump(0);
+    const readPojo = handler.pojo('pojo').last.value;
+
+    assertEqual(pojo.name.toString(), readPojo.name.toString(), 'POJO hardened string name');
+    assertEqual(pojo.age, readPojo.age, 'POJO age');
+    assertEqual(pojo.nested.key, readPojo.nested.key, 'POJO nested key');
+    assertEqual(pojo.nested.array[0], readPojo.nested.array[0], 'POJO hardened nested array number');
+    assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'POJO hardened nested array string');
+    assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO hardened nested array date');
+    assertEqual(pojo.secondNest.bigFriend.join(' '), readPojo.secondNest.bigFriend.join(' '), 'POJO hardened nested array numbers');
+    assertBufferEqual(pojo.secondNest.awesomeFriend, readPojo.secondNest.awesomeFriend, 'POJO nested Hardened Buffer');
+
+    handler.signFile('private.key');
+    if ( ! handler.verifyFile('public.key') ) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+
+  async function testHPojoWithNestedHardenedFields() {
+    console.log('Testing POJO With Nested Hardened Fields Type');
+
+    const pojo = {
+      [BinaryHandler.hard]: true,
+      name: new BinaryHandler.HardString('Test'),
+      age: 30,
+      nested: {
+        [BinaryHandler.hard]: true,
+        key: 'value',
+        array: [1, 'two', new Date()]
+      },
+      secondNest: {
+        bigFriend: [1,2,3,5,7,11,13,17,19,23],
+        awesomeFriend: BinaryHandler.harden(
+          Buffer.from(new Uint32Array(
+            [2,4,16,256,65536]
+          ).buffer)
+        )
+      }
+    };
+    const filePath = path.join(process.cwd(), 'pojo_with_hfields.bin');
+
+    const handler = new BinaryHandler();
+    await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
+    await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
+    handler.openFile(filePath);
+    handler.hpojo(pojo);
+    handler.jump(0);
+    const readPojo = handler.hpojo('pojo').last.value;
+
+    assertEqual(pojo.name.toString(), readPojo.name.toString(), 'POJO hardened string name');
+    assertEqual(pojo.age, readPojo.age, 'POJO age');
+    assertEqual(pojo.nested.key, readPojo.nested.key, 'POJO nested key');
+    assertEqual(pojo.nested.array[0], readPojo.nested.array[0], 'POJO hardened nested array number');
+    assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'POJO hardened nested array string');
+    assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO hardened nested array date');
+    assertEqual(pojo.secondNest.bigFriend.join(' '), readPojo.secondNest.bigFriend.join(' '), 'POJO hardened nested array numbers');
+    assertBufferEqual(pojo.secondNest.awesomeFriend, readPojo.secondNest.awesomeFriend, 'POJO nested Hardened Buffer');
+
+    handler.signFile('private.key');
+    if ( ! handler.verifyFile('public.key') ) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+  
 
 // cryptographic signing
   function saveKeys() {

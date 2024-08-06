@@ -17,55 +17,22 @@ const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 // 32-bit register for bit operations that will not result in signed integers
 const R32 = new Uint32Array(1);
 
-const BinaryType = {
-  STRING: 1,
-  FLOAT: 2,
-  DATE: 3,
-  HETERO_ARRAY: 4,
-  POJO: 5,
-  MAP: 6,
-  SET: 7,
-  BUFFER: 8,
-  BOOL: 9,
-  BIGINT: 10,
-  INT8: 11,
-  UINT8: 12,
-  INT16: 13,
-  UINT16: 14,
-  INT32: 15,
-  UINT32: 16,
-  DOUBLE: 17,
-  HPOJO: 18, // hardened pojo
-  HSTRING: 19, // hardened string
-  HBUFFER: 20, // hardened buffer
-};
-
-const EncodingType = {
-  'utf8': 1,
-  'utf16le': 2,
-  'latin1': 3,
-  'base64': 4,
-  'base64url': 5,
-  'hex': 6,
-  'ascii': 7,
-  'binary': 8, // Alias for 'latin1'
-  'ucs2': 9 // Alias of 'utf16le'
-};
-
-const EncodingMap = {};
-
-Object.entries(EncodingType).forEach(([key, value]) => {
-  EncodingMap[key] = value;
-  EncodingMap[value] = key;
-});
+// class Hardened wrapper for string as we cannot ad properties to strings
+class HardString extends String {}
 
 class BinaryHandler {
-  // Init
+  // Class static
+    static get HardString() { 
+      return HardString;
+    }
+
+  // Instance init
     constructor(endian = 'BE') {
       this.endian = endian;
       this._buffer = Buffer.alloc(0);
       this.reading = [];
       this.fd = null;
+      this._nfCount = 0;
       this._noFile = false;
       this._cursor = 0;
       this._noFileCursor = 0;
@@ -78,18 +45,40 @@ class BinaryHandler {
       return Symbol.for(`[[hardened]]`);
     }
 
+    static harden(thing) {
+      if ( thing instanceof HardString ) return thing;
+      if ( thing[this.hard] ) return thing;
+      if ( thing instanceof String || typeof thing == 'string' ) {
+        return new HardString(thing)
+      }
+      if ( Buffer.isBuffer(thing) ) {
+        thing[this.hard] = true;
+        return thing;
+      }
+      if (typeof thing === 'object' && thing !== null) {
+        thing[this.hard] = true;
+        return thing;
+      }
+      throw new TypeError(`To harden an item, it must already be a String, a Buffer or a JavaScript object`);
+    }
+
     get noFile() { return this._noFile };
 
     set noFile(noFile) {
       DEBUG && console.log(`Setting noFile`, noFile, this.noFileBuffer, this.cursor);
       if ( noFile ) {
+        this._nfCount++;
         if ( !this.noFileBuffer ) this.noFileBuffer = Buffer.alloc(0);
+        this._noFile = true;
       } else {
-        this.noFileBuffer = null;
-        this._noFileCursor = 0;
-        this._noFileBitCursor = 0;
+        this._nfCount--;
+        if ( this._nfCount == 0 ) {
+          this.noFileBuffer = null;
+          this._noFileCursor = 0;
+          this._noFileBitCursor = 0;
+          this._noFile = false;
+        }
       }
-      this._noFile = noFile;
     }
 
     get cursor() { 
@@ -846,7 +835,7 @@ class BinaryHandler {
 
     // String put
     puts(value, len = null, encoding = 'utf8') {
-      if ( value[this.constructor.hard] ) return this.hputs(value);
+      if ( value instanceof HardString ) return this.hputs(value);
       this._alignToNextWrite();
       let buffer;
 
@@ -911,13 +900,16 @@ class BinaryHandler {
       if ( !this.publicKey ) {
         throw new Error(`Hardened string write requires RSA public key be set for encryption.`);
       }
+      if ( ! (value instanceof HardString) ) {
+        throw new Error(`strings needs to be of type HardString. Ensure hardString = new ${this.constructor.name}.HardString(originalString) before calling hputs`);
+      }
       
       this._alignToNextWrite();
       let stringBuffer;
       {//no file block to obtain the raw bytes of the string
         this.noFile = true;
         this._alignToNextWrite();
-        this.puts(value);
+        this.puts(value.toString());
         stringBuffer = this.noFileBuffer;
         this.noFile = false;
       }
@@ -934,15 +926,18 @@ class BinaryHandler {
       
       this._alignToNextRead();
       const encryptedBuffer = this.buffer().last.value;
+      console.log({encryptedBuffer, key, pK: this.privateKey, r: this.reading});
       const decryptedBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
       let originalString;
       {//no file block
         this.noFile = true;
         this._alignToNextRead();
-        this.noFileBuffer = decryptedBuffer;
+        this.noFileBuffer = Buffer.concat([this.noFileBuffer, decryptedBuffer]);
         originalString = this.gets().last.value;
         this.noFile = false;
       }
+
+      originalString = new HardString(originalString);
 
       this.reading.push({ key: key || 'hstring', value: originalString, type: 'hstring' });
       return this;
@@ -950,7 +945,9 @@ class BinaryHandler {
 
     hpojo(object) {
       if (typeof object === 'object' && object !== null) {
-        if ( !object[this.constructor.hard] ) return this.pojo(object);
+        if ( !object[this.constructor.hard] ) {
+          throw new Error(`Hardened object requires slot Symbol([[hardened]]) to be true. Ensure obj[${this.constructor.name}.hard] = true before calling hpojo`);
+        }
         if ( !this.publicKey ) {
           throw new Error(`Hardened object write requires RSA public key be set for encryption.`);
         }
@@ -966,6 +963,7 @@ class BinaryHandler {
           this.noFile = false;
         }
 
+        console.log({pk: this.publicKey, pojoBuffer});
         const encryptedBuffer = crypto.publicEncrypt(this.publicKey, pojoBuffer);
         this.buffer(encryptedBuffer);
         return this;
@@ -994,7 +992,9 @@ class BinaryHandler {
 
     hbuffer(keyOrBuffer) {
       if (Buffer.isBuffer(keyOrBuffer)) {
-        if ( !keyOrBuffer[this.constructor.hard] ) return this.buffer(keyOrBuffer);
+        if ( !keyOrBuffer[this.constructor.hard] ) {
+          throw new Error(`Hardened buffer requires slot Symbol([[hardened]]) to be true. Ensure buf[${this.constructor.name}.hard] = true before calling hbuffer`);
+        }
         if ( !this.publicKey ) {
           throw new Error(`Hardened buffer write requires RSA public key be set for encryption.`);
         }
@@ -1010,7 +1010,7 @@ class BinaryHandler {
           this.noFile = false;
         }
 
-        const encryptedBuffer = crypto.publicEncrypt(this.publicKey, plainBuffer);
+        const encryptedBuffer = rsaEncrypt(this.publicKey, plainBuffer);
         this.buffer(encryptedBuffer);
         return this;
       } else if (typeof keyOrBuffer === 'string' || keyOrBuffer === undefined) {
@@ -1019,7 +1019,7 @@ class BinaryHandler {
         }
         this._alignToNextRead();
         const encryptedBuffer = this.buffer().last.value
-        const originalBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+        const originalBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
         let plainBuffer;
         {//no file block
           this.noFile = true;
@@ -1150,6 +1150,7 @@ class BinaryHandler {
         this.writeLength(keys.length);
         for (const key of keys) {
           this.puts(key);
+          DEBUG && console.log({key, val: obj[key], obj});
           this._writeTypeAndValue(obj[key]);
         }
         return this;
@@ -1196,6 +1197,9 @@ class BinaryHandler {
       if (typeof value === 'string') {
         this.uint8(BinaryType.STRING); // Type flag for string
         this.puts(value);
+      } else if (value instanceof HardString) {
+        this.uint8(BinaryType.HSTRING); // Type flag for hardened string
+        this.hputs(value);
       } else if (typeof value === 'number') {
         // Determine the appropriate type for the number
         if (Number.isInteger(value)) {
@@ -1238,11 +1242,22 @@ class BinaryHandler {
         this.uint8(BinaryType.SET); // Type flag for set
         this.set(value);
       } else if (Buffer.isBuffer(value)) {
-        this.uint8(BinaryType.BUFFER); // Type flag for buffer
-        this.buffer(value);
+        if ( value[this.constructor.hard] ) {
+          this.uint8(BinaryType.HBUFFER);
+          this.hbuffer(value);
+        } else {
+          this.uint8(BinaryType.BUFFER); // Type flag for buffer
+          this.buffer(value);
+        }
       } else if (typeof value === 'object' && value !== null) {
-        this.uint8(BinaryType.POJO);
-        this.pojo(value);
+        if ( value[this.constructor.hard] ) {
+          this.uint8(BinaryType.HPOJO);
+          console.log({value});
+          this.hpojo(value);
+        } else {
+          this.uint8(BinaryType.POJO);
+          this.pojo(value);
+        }
       } else if (typeof value === 'boolean') {
         this.uint8(BinaryType.BOOL); // Type flag for bool
         this.bool(value);
@@ -1465,86 +1480,163 @@ class BinaryHandler {
     }
 }
 
-const BinaryTypes = {
-  types: {},
-
-  define(name, fields) {
-    this.types[name] = fields;
-  },
-
-  read(handler, name) {
-    const type = this.types[name];
-    const result = {};
-    for (const field of type) {
-      handler[field.type](field.name);
-      const { value, type: valueType } = handler.reading.find(f => f.key === field.name);
-      result[field.name] = { value, type: valueType };
+// Crypto support
+  function chunkData(data, chunkSize) {
+    let chunks = [];
+    for (let i = 0; i < data.length; i += chunkSize) {
+      chunks.push(data.slice(i, i + chunkSize));
     }
-    return result;
-  },
-
-  write(handler, name, data) {
-    const type = this.types[name];
-    for (const field of type) {
-      handler[field.type](data[field.name]);
-    }
+    return chunks;
   }
-};
 
-const BinaryUtils = {
-  ENCODE_SHIFT: 3,
+  // Function to encrypt data in chunks using RSA with OAEP padding
+  function rsaEncrypt(publicKey, data) {
+    const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+    const padding = crypto.constants.RSA_PKCS1_OAEP_PADDING;
+    const chunkSize = keySize - 42; // Adjust according to the padding
 
-  padBits(bits, length) {
-    while (bits.length < length) {
-      bits.push(0);
-    }
-    return bits;
-  },
+    const chunks = chunkData(data, chunkSize);
+    const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt({ key: publicKey, padding }, chunk));
 
-  chopBits(bits, length) {
-    return bits.slice(0, length);
-  },
+    return Buffer.concat(encryptedChunks);
+  }
 
-  encode(buffer) {
-    const EC = this.ENCODE_SHIFT;
-    const ER = 8 - EC;
-    if (buffer.length == 0) return;
+  // Function to decrypt data in chunks using RSA with OAEP padding
+  function rsaDecrypt(privateKey, encryptedData) {
+    const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+    const padding = crypto.constants.RSA_PKCS1_OAEP_PADDING;
 
-    let leftCarry = buffer[0] >> ER;
+    const chunks = chunkData(encryptedData, keySize);
+    const decryptedChunks = chunks.map(chunk => crypto.privateDecrypt({ key: privateKey, padding }, chunk));
 
-    for (let i = 0; i < buffer.length; i++) {
-      const currentByte = buffer[i];
-      buffer[i] = (currentByte << EC) & 0xFF;
-      if ((i + 1) === buffer.length) {
-        buffer[i] |= leftCarry;
-      } else {
-        buffer[i] |= (buffer[i + 1] >> ER) & 0xFF;
+    return Buffer.concat(decryptedChunks);
+  }
+
+// Transcoding Support Values
+  const BinaryType = {
+    STRING: 1,
+    FLOAT: 2,
+    DATE: 3,
+    HETERO_ARRAY: 4,
+    POJO: 5,
+    MAP: 6,
+    SET: 7,
+    BUFFER: 8,
+    BOOL: 9,
+    BIGINT: 10,
+    INT8: 11,
+    UINT8: 12,
+    INT16: 13,
+    UINT16: 14,
+    INT32: 15,
+    UINT32: 16,
+    DOUBLE: 17,
+    HPOJO: 18, // hardened pojo
+    HSTRING: 19, // hardened string
+    HBUFFER: 20, // hardened buffer
+  };
+
+  const EncodingType = {
+    'utf8': 1,
+    'utf16le': 2,
+    'latin1': 3,
+    'base64': 4,
+    'base64url': 5,
+    'hex': 6,
+    'ascii': 7,
+    'binary': 8, // Alias for 'latin1'
+    'ucs2': 9 // Alias of 'utf16le'
+  };
+
+  const EncodingMap = {};
+
+  Object.entries(EncodingType).forEach(([key, value]) => {
+    EncodingMap[key] = value;
+    EncodingMap[value] = key;
+  });
+
+// Sketch of custom type definitions
+  const BinaryTypes = {
+    types: {},
+
+    define(name, fields) {
+      this.types[name] = fields;
+    },
+
+    read(handler, name) {
+      const type = this.types[name];
+      const result = {};
+      for (const field of type) {
+        handler[field.type](field.name);
+        const { value, type: valueType } = handler.reading.find(f => f.key === field.name);
+        result[field.name] = { value, type: valueType };
+      }
+      return result;
+    },
+
+    write(handler, name, data) {
+      const type = this.types[name];
+      for (const field of type) {
+        handler[field.type](data[field.name]);
       }
     }
+  };
 
-    return buffer;
-  },
+// Helper collections
+  const BinaryUtils = {
+    ENCODE_SHIFT: 3,
 
-  decode(buffer) {
-    const EC = this.ENCODE_SHIFT;
-    const ER = 8 - EC;
-    if (buffer.length == 0) return;
-
-    let rightCarry = buffer[buffer.length - 1] << ER;
-
-    for (let i = buffer.length - 1; i >= 0; i--) {
-      const currentByte = buffer[i];
-      buffer[i] = (currentByte >> EC) & 0xFF;
-      if (i === 0) {
-        buffer[i] |= rightCarry & 0xFF;
-      } else {
-        buffer[i] |= (buffer[i - 1] << ER) & 0xFF;
+    padBits(bits, length) {
+      while (bits.length < length) {
+        bits.push(0);
       }
+      return bits;
+    },
+
+    chopBits(bits, length) {
+      return bits.slice(0, length);
+    },
+
+    encode(buffer) {
+      const EC = this.ENCODE_SHIFT;
+      const ER = 8 - EC;
+      if (buffer.length == 0) return;
+
+      let leftCarry = buffer[0] >> ER;
+
+      for (let i = 0; i < buffer.length; i++) {
+        const currentByte = buffer[i];
+        buffer[i] = (currentByte << EC) & 0xFF;
+        if ((i + 1) === buffer.length) {
+          buffer[i] |= leftCarry;
+        } else {
+          buffer[i] |= (buffer[i + 1] >> ER) & 0xFF;
+        }
+      }
+
+      return buffer;
+    },
+
+    decode(buffer) {
+      const EC = this.ENCODE_SHIFT;
+      const ER = 8 - EC;
+      if (buffer.length == 0) return;
+
+      let rightCarry = buffer[buffer.length - 1] << ER;
+
+      for (let i = buffer.length - 1; i >= 0; i--) {
+        const currentByte = buffer[i];
+        buffer[i] = (currentByte >> EC) & 0xFF;
+        if (i === 0) {
+          buffer[i] |= rightCarry & 0xFF;
+        } else {
+          buffer[i] |= (buffer[i - 1] << ER) & 0xFF;
+        }
+      }
+
+      return buffer;
     }
+  };
 
-    return buffer;
-  }
-};
-
-export { BinaryHandler, BinaryTypes, BinaryUtils, BinaryType };
+export { BinaryHandler, BinaryTypes };
 
