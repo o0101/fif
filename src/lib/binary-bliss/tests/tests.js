@@ -28,6 +28,7 @@ runTests();
     } else {
       await testHardenedPojo();
       await testHardenedBuffer();
+      await testHardenedString();
       testColorType();
       bitTests();
       testBufferType();
@@ -1446,6 +1447,35 @@ runTests();
       console.error(`${redCross} Test failed: File failed to verify.`);
     } else {
       console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+  
+  async function testHardenedString() {
+    console.log('Testing HSTRING Type');
+
+    const handler = new BinaryHandler();
+    await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
+    await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
+
+    const testString = 'This is a test string for hputs and hgets';
+    const filePath = path.join(process.cwd(), 'hstring.bin');
+
+    handler.openFile(filePath);
+    testString[BinaryHandler.hard] = true;
+    handler.hputs(testString);
+    handler.jump(0);
+
+    const readString = handler.hgets().last.value;
+
+    assertEqual(testString, readString, 'HSTRING');
+
+    handler.signFile(path.resolve(os.homedir(), '.ssh/id_rsa'));
+    if (!handler.verifyFile(path.resolve(os.homedir(), '.ssh/id_rsa.pub'))) {
+      console.error(`❌ Test failed: File failed to verify.`);
+    } else {
+      console.log(`✅ Test passed: File signature successfully verified.`);
     }
 
     handler.closeFile();

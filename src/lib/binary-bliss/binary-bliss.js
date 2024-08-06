@@ -907,19 +907,44 @@ class BinaryHandler {
     }
 
   // hardened
-    hputs() {
-      if ( ! this.publicKey ) {
-        throw new Error(`Hardened string write requires public key for encryption`);
-      } 
-      throw new Error(`Implement`);
+    hputs(value) {
+      if ( !this.publicKey ) {
+        throw new Error(`Hardened string write requires RSA public key be set for encryption.`);
+      }
+      
+      this._alignToNextWrite();
+      let stringBuffer;
+      {//no file block to obtain the raw bytes of the string
+        this.noFile = true;
+        this._alignToNextWrite();
+        this.puts(value);
+        stringBuffer = this.noFileBuffer;
+        this.noFile = false;
+      }
+
+      const encryptedBuffer = crypto.publicEncrypt(this.publicKey, stringBuffer);
+      this.buffer(encryptedBuffer);
       return this;
     }
 
-    hgets() {
-      if ( ! this.privateKey ) {
-        throw new Error(`Hardened string read requires private key for decryption`);
+    hgets(key) {
+      if ( !this.privateKey ) {
+        throw new Error(`Hardened string read requires RSA private key be set for decryption.`);
       }
-      throw new Error(`Implement`);
+      
+      this._alignToNextRead();
+      const encryptedBuffer = this.buffer().last.value;
+      const decryptedBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+      let originalString;
+      {//no file block
+        this.noFile = true;
+        this._alignToNextRead();
+        this.noFileBuffer = decryptedBuffer;
+        originalString = this.gets().last.value;
+        this.noFile = false;
+      }
+
+      this.reading.push({ key: key || 'hstring', value: originalString, type: 'hstring' });
       return this;
     }
 
