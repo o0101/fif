@@ -7,6 +7,8 @@ import { Buffer } from 'buffer';
 import path from 'path';
 import zlib from 'zlib';
 import { sign, verify } from '@noble/ed25519';
+import crypto from 'crypto';
+import { parseKey } from './keys.js';
 
 const ATextEncoder = new TextEncoder;
 const ATextDecoder = new TextDecoder;
@@ -35,6 +37,9 @@ const BinaryType = {
   INT32: 15,
   UINT32: 16,
   DOUBLE: 17,
+  HPOJO: 18, // hardened pojo
+  HSTRING: 19, // hardened string
+  HBUFFER: 20, // hardened buffer
 };
 
 const EncodingType = {
@@ -57,6 +62,9 @@ Object.entries(EncodingType).forEach(([key, value]) => {
 });
 
 class BinaryHandler {
+  static get hard() {
+    return Symbol.for(`[[hardened]]`);
+  }
   // Init, config, file access, and checks
     constructor(endian = 'BE') {
       this.endian = endian;
@@ -681,6 +689,7 @@ class BinaryHandler {
         this.reading.push({ key, value: Buffer.from(buffer), type: 'buffer' });
         return this;
       } else if (Buffer.isBuffer(keyOrBuffer)) {
+        if ( keyOrBuffer[this.constructor.hard] ) return this.hbuffer(keyOrBuffer);
         this._alignToNextWrite();
         const buffer = keyOrBuffer;
         this._validateBuffer(buffer);
@@ -747,6 +756,7 @@ class BinaryHandler {
 
     // String put
     puts(value, len = null, encoding = 'utf8') {
+      if ( value[this.constructor.hard] ) return this.hputs(value);
       this._alignToNextWrite();
       let buffer;
 
@@ -805,6 +815,44 @@ class BinaryHandler {
       } else {
         throw new Error('Invalid argument for bigInt method');
       }
+    }
+
+  // hardened
+    hputs() {
+      if ( ! this.publicKey ) {
+        throw new Error(`Hardened string write requires public key for encryption`);
+      }
+      return this;
+    }
+
+    hgets() {
+      if ( ! this.privateKey ) {
+        throw new Error(`Hardened string read requires private key for decryption`);
+      }
+      return this;
+    }
+
+    hpojo() {
+      if ( ! this.privateKey && ! this.publicKey ) {
+        throw new Error(`Hardened object requires RSA key be set`);
+      }
+      // read
+        // read a buffer
+        // decrypt it
+        // pass the decrypted buffer to pojo
+        // set that value as reading/last
+      // write
+        // pass object to pojo for write to buffer
+        // encrypt that buffer 
+        // wrtie the encrypted buffer with buffer
+      return this;
+    }
+
+    hbuffer() {
+      if ( ! this.privateKey && ! this.publicKey ) {
+        throw new Error(`Hardened buffer requires RSA key be set`);
+      }
+      return this;
     }
 
   // Complex and collection types
@@ -910,6 +958,7 @@ class BinaryHandler {
 
     pojo(keyOrValue) {
       if (typeof keyOrValue === 'object' && keyOrValue !== null) {
+        if ( keyOrValue[this.constructor.hard] ) return this.hpojo(keyOrValue);
         this._alignToNextWrite();
         const obj = keyOrValue;
         const keys = Object.keys(obj);
@@ -1080,6 +1129,15 @@ class BinaryHandler {
         case BinaryType.DOUBLE:
           value = this.double(uniq).last.value;
           break;
+        case BinaryType.HPOJO:
+          value = this.hpojo(uniq).last.value;
+          break;
+        case BinaryType.HSTRING:
+          value = this.hgets(uniq).last.value;
+          break;
+        case BinaryType.HBUFFER:
+          value = this.hbuffer(uniq).last.value;
+          break;
         default:
           throw new Error('Unknown type in _readTypeAndValue: ' + type);
       }
@@ -1140,6 +1198,20 @@ class BinaryHandler {
         this._writeBytes(Buffer.concat([typeBuffer, lengthBuffer, compressedData]));
       }
       return this;
+    }
+
+    async setPublicKey(filePath) {
+      const {publicKey, type} = await parseKey(filePath);
+      if ( type != 'rsa' || ! publicKey ) {
+        throw new Error(`RSA public key required`);
+      }
+    }
+
+    async setPrivateKey(filePath) {
+      const {privateKey, type} = await parseKey(filePath);
+      if ( type != 'rsa' || ! privateKey ) {
+        throw new Error(`RSA private key required`);
+      }
     }
 
   // File signing and verification 
