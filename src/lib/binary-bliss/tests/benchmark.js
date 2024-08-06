@@ -1,4 +1,4 @@
-import { BinaryHandler } from './binary-bliss.js';
+import { BinaryHandler } from '../binary-bliss.js';
 import { unlinkSync, existsSync } from 'fs';
 import path from 'path';
 
