@@ -946,7 +946,7 @@ class BinaryHandler {
         return this;
       } else {
         if ( !this.privateKey ) {
-          throw new Error(`Hardened object write requires RSA private key be set for decryption.`);
+          throw new Error(`Hardened object read requires RSA private key be set for decryption.`);
         }
         this._alignToNextRead();
         const encryptedBuffer = this.buffer().last.value
@@ -967,11 +967,51 @@ class BinaryHandler {
       }
     }
 
-    hbuffer() {
-      if ( ! this.privateKey && ! this.publicKey ) {
-        throw new Error(`Hardened buffer requires RSA key be set`);
-      } 
-      throw new Error(`Implement`);
+    hbuffer(keyOrBuffer) {
+      if (Buffer.isBuffer(keyOrBuffer)) {
+        if ( !keyOrBuffer[this.constructor.hard] ) return this.buffer(keyOrBuffer);
+        if ( !this.publicKey ) {
+          throw new Error(`Hardened buffer write requires RSA public key be set for encryption.`);
+        }
+        this._alignToNextWrite();
+        let plainBuffer;
+        {//no file block to obtain the raw bytes of the pojo 
+          this.noFile = true;
+          this._alignToNextWrite();
+          keyOrBuffer[this.constructor.hard] = false;
+          this.buffer(keyOrBuffer);
+          keyOrBuffer[this.constructor.hard] = true;
+          plainBuffer = this.noFileBuffer;
+          this.noFile = false;
+        }
+
+        const encryptedBuffer = crypto.publicEncrypt(this.publicKey, plainBuffer);
+        this.buffer(encryptedBuffer);
+        return this;
+      } else if (typeof keyOrBuffer === 'string' || keyOrBuffer === undefined) {
+        if ( !this.privateKey ) {
+          throw new Error(`Hardened buffer read requires RSA private key be set for decryption.`);
+        }
+        this._alignToNextRead();
+        const encryptedBuffer = this.buffer().last.value
+        const originalBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+        let plainBuffer;
+        {//no file block
+          this.noFile = true;
+          this._alignToNextRead();
+          this.noFileBuffer = originalBuffer;
+          plainBuffer = this.buffer().last.value;
+          DEBUG && console.log({plainBuffer, originalBuffer, encryptedBuffer});
+          this.noFile = false;
+        }
+        const key = keyOrBuffer || 'hbuffer';
+        plainBuffer[this.constructor.hard] = true;
+        this.reading.push({ key, value: plainBuffer, type: 'hbuffer' });
+        return this;
+      } else {
+        throw new Error('Invalid argument for hardened buffer method');
+      }
+
       return this;
     }
 
