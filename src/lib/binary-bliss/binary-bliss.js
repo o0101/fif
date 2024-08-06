@@ -10,12 +10,10 @@ import { sign, verify } from '@noble/ed25519';
 import crypto from 'crypto';
 import { parseKey } from './keys.js';
 
-const ATextEncoder = new TextEncoder;
-const ATextDecoder = new TextDecoder;
-const ETEXT = true;
-
-const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 const DEBUG = false;
+
+const ETEXT = true;
+const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 // 32-bit register for bit operations that will not result in signed integers
 const R32 = new Uint32Array(1);
 
@@ -818,7 +816,6 @@ class BinaryHandler {
         this._validateLength(len); // Validate the length
         this._ensureBytes(len);
         let value = this._readBytes(len, { decode: ETEXT }).toString(encoding);
-        value = ATextDecoder.decode(value.buffer.slice(0, value.length));
         this.reading.push({ key, value, type: 'string' });
       } else {
         // Read metadata
@@ -839,9 +836,7 @@ class BinaryHandler {
         } else {
           value = this._readBytes(strLength, { decode: ETEXT });
           DEBUG && console.log({value});
-          //value = ATextDecoder.decode(value.buffer.slice(0, value.length));
-          //const TD = new TextDecoder;
-          //value = TD.decode(new Uint8Array(value));
+          value = value.toString();
           DEBUG && console.log({decoder:true, value, u8: new Uint8Array(value)});
         }
         this.reading.push({ key, value, type: 'string' });
@@ -858,8 +853,7 @@ class BinaryHandler {
       if (encoding === 'binary') {
         buffer = Buffer.from(value, 'latin1');
       } else {
-        const encodedValue = ATextEncoder.encode(value);
-        buffer = Buffer.from(encodedValue, encoding);
+        buffer = Buffer.from(value, encoding);
       }
 
       if (len === null) {
@@ -1295,7 +1289,7 @@ class BinaryHandler {
         compressedData = this.decompressData(compressedData);
         let value;
         if (type === BinaryType.STRING) {
-          value = ATextDecoder.decode(compressedData);
+          value = compressedData.toString();
         } else if (type === BinaryType.BUFFER) {
           value = compressedData;
         } else {
@@ -1308,7 +1302,7 @@ class BinaryHandler {
         const { data } = options;
         let encodedData, type;
         if (typeof data === 'string') {
-          encodedData = Buffer.from(ATextEncoder.encode(data));
+          encodedData = Buffer.from(data);
           type = BinaryType.STRING; // Type flag for string
         } else if (Buffer.isBuffer(data)) {
           encodedData = data;

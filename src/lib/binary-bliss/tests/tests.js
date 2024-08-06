@@ -1472,7 +1472,6 @@ async function runTests() {
   cleanUp('public.key', true);
 }
 
-//runTests();
-testHardenedPojo();
+runTests();
 
 
