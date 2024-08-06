@@ -62,19 +62,72 @@ Object.entries(EncodingType).forEach(([key, value]) => {
 });
 
 class BinaryHandler {
-  static get hard() {
-    return Symbol.for(`[[hardened]]`);
-  }
-  // Init, config, file access, and checks
+  // Init
     constructor(endian = 'BE') {
       this.endian = endian;
       this._buffer = Buffer.alloc(0);
-      this.cursor = 0;
-      this.bitCursor = 0;
       this.reading = [];
       this.fd = null;
+      this._noFile = false;
+      this._cursor = 0;
+      this._noFileCursor = 0;
+      this._bitCursor = 0;
+      this._noFileBitCursor = 0;
     }
 
+  // Helper variables related to various modes
+    static get hard() {
+      return Symbol.for(`[[hardened]]`);
+    }
+
+    get noFile() { return this._noFile };
+
+    set noFile(noFile) {
+      DEBUG && console.log(`Setting noFile`, noFile, this.noFileBuffer, this.cursor);
+      if ( noFile ) {
+        if ( !this.noFileBuffer ) this.noFileBuffer = Buffer.alloc(0);
+      } else {
+        this.noFileBuffer = null;
+        this._noFileCursor = 0;
+        this._noFileBitCursor = 0;
+      }
+      this._noFile = noFile;
+    }
+
+    get cursor() { 
+      if ( this.noFile ) {
+        return this._noFileCursor;
+      } else {
+        return this._cursor;
+      }
+    }
+
+    set cursor(cursor) {
+      DEBUG && console.log(`Setting cursor`, cursor, this.noFileBuffer);
+      if ( this.noFile ) {
+        this._noFileCursor = cursor;
+      } else {
+        this._cursor = cursor;
+      }
+    }
+
+    get bitCursor() { 
+      if ( this.noFile ) {
+        return this._noFileBitCursor;
+      } else {
+        return this._bitCursor;
+      }
+    }
+
+    set bitCursor(bitCursor) {
+      if ( this.noFile ) {
+        this._noFileBitCursor = bitCursor;
+      } else {
+        this._bitCursor = bitCursor;
+      }
+    }
+
+  // File tooling 
     openFile(filePath, { append = false, mode = 0o666 } = {}) {
       const safePath = path.resolve(filePath);
       let flag;
@@ -161,6 +214,7 @@ class BinaryHandler {
       return this;
     }
 
+  // Bounds checks
     _validateLength(length) {
       if (typeof length !== 'number' || length <= 0 || length > MAX_BUFFER_SIZE) {
         console.error({ length });
@@ -175,12 +229,17 @@ class BinaryHandler {
     }
 
     _ensureBytes(length) {
-      if (this.fd === null) {
+      let size;
+      if ( this.noFile ) {
+        size = this.noFileBuffer.length;
+      } else if ( this.fd ) {
+        ({size} = fstatSync(this.fd));
+      } else if (this.fd === null) {
         throw new Error('File is not open');
       }
-      const stats = fstatSync(this.fd);
-      if (this.cursor + length > stats.size) {
-        throw new Error('Insufficient data in file: ' + this.filePath);
+
+      if (this.cursor + length > size) {
+        throw new Error(`Insufficient data in ${this.noFile ? 'memory buffer' : ('file ' + this.filePath)}. At cursor ${this.cursor} sought ${length} more bytes, but only ${Math.max(0, size - (this.cursor + length))} remain.`);
       }
     }
 
@@ -263,6 +322,7 @@ class BinaryHandler {
       } else if (length <= 0x3FFF) { // 01 - 2 bytes
         buffer = Buffer.alloc(2);
         buffer.writeUInt16BE(length | 0x4000, 0);
+        DEBUG && console.log({length, lenghtOR: length | 0x4000, lengthORHex: (length|0x4000).toString('16')});
       } else if (length <= 0x3FFFFF) { // 10 - 3 bytes
         buffer = Buffer.alloc(3);
         buffer.writeUIntBE(length | 0x800000, 0, 3);
@@ -285,6 +345,7 @@ class BinaryHandler {
         buffer[0] = firstByte;
         buffer[1] = this._readBytes(1).readUInt8(0);
         length = ((buffer.readUInt16BE(0) & 0x3FFF));
+        DEBUG && console.log({length, firstByte, buffer});
       } else if ((firstByte & 0xC0) === 0x80) { // 10
         const buffer = Buffer.alloc(3);
         buffer[0] = firstByte;
@@ -318,7 +379,7 @@ class BinaryHandler {
     }
 
     jumpEnd() {
-      if ( ! this.fd ) {
+      if ( ! this.fd && ! this.noFile ) {
         throw new Error(`No open file to jump to the end of.`);
       } 
       if (this._buffer.length) {
@@ -326,14 +387,25 @@ class BinaryHandler {
         DEBUG && console.log(`Wrote ${this._buffer.length} bytes at jump to ${cursorPosition}.`);
         this._buffer = Buffer.alloc(0);
       }
-      const {size} = fstatSync(this.fd);
+
+      let size;
+      if ( this.noFile ) {
+        size = this.noFileBuffer.length;
+      } else if ( this.fd ) {
+        ({size} = fstatSync(this.fd));
+      }
       this.cursor = size;
       this.bitCursor = 0;
     }
 
     isEOF() {
-      if ( this.fd ) {
-        const {size} = fstatSync(this.fd);
+      if ( this.fd || this.noFile ) {
+        let size;
+        if ( this.noFile ) {
+          size = this.noFileBuffer.length;
+        } else {
+          ({size} = fstatSync(this.fd));
+        }
         if ( this.cursor < size ) return false;
       }
       return true;
@@ -358,19 +430,33 @@ class BinaryHandler {
     _readBytes(length, opts = {}) {
       try {
         this._validateLength(length);
-        const stats = fstatSync(this.fd);
-        if (this.cursor + length > stats.size) {
-          throw new Error('Insufficient data in file: ' + this.filePath);
+
+        let size;
+        if ( this.noFile ) {
+          size = this.noFileBuffer.length;
+        } else {
+          ({size} = fstatSync(this.fd));
         }
 
-        const buffer = Buffer.alloc(length);
-        readSync(this.fd, buffer, 0, length, this.cursor);
+        if (this.cursor + length > size) {
+          throw new Error(`Insufficient data in ${this.noFile ? 'memory buffer' : ('file ' + this.filePath)}. At cursor ${this.cursor} sought ${length} more bytes, but only ${Math.max(0, size - (this.cursor + length))} remain.`);
+        }
+
+        let buffer;
+        if ( this.noFile ) {
+          buffer = Buffer.from(this.noFileBuffer.subarray(this.cursor, this.cursor+length));
+          DEBUG && console.log({noFile:true,buffer});
+        } else {
+          buffer = Buffer.alloc(length);
+          DEBUG && console.log({file:true,buffer});
+          readSync(this.fd, buffer, 0, length, this.cursor);
+        }
         if (opts.decode && ETEXT) {
           BinaryUtils.decode(buffer);
         }
         this.cursor += length;
 
-        DEBUG && console.log(`Read bytes: length=${length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
+        DEBUG && console.log(`Read bytes: length=${length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')} (text: ${buffer.toString()})`);
         return buffer;
       } catch (error) {
         console.error('Error reading bytes:', error);
@@ -385,7 +471,12 @@ class BinaryHandler {
         if (opts.encode && ETEXT) {
           BinaryUtils.encode(buffer);
         }
-        writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
+        if ( this.noFile ) {
+          if ( ! this.noFileBuffer ) this.noFileBuffer = Buffer.alloc(0);
+          this.noFileBuffer = Buffer.concat([this.noFileBuffer, buffer]);
+        } else {
+          writeSync(this.fd, buffer, 0, buffer.length, this.cursor);
+        }
         this.cursor += buffer.length;
 
         DEBUG && console.log(`Wrote bytes (${this.filePath}): length=${buffer.length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
@@ -747,7 +838,11 @@ class BinaryHandler {
           value = this._readBytes(strLength).toString('latin1');
         } else {
           value = this._readBytes(strLength, { decode: ETEXT });
-          value = ATextDecoder.decode(value.buffer.slice(0, value.length));
+          DEBUG && console.log({value});
+          //value = ATextDecoder.decode(value.buffer.slice(0, value.length));
+          //const TD = new TextDecoder;
+          //value = TD.decode(new Uint8Array(value));
+          DEBUG && console.log({decoder:true, value, u8: new Uint8Array(value)});
         }
         this.reading.push({ key, value, type: 'string' });
       }
@@ -821,7 +916,8 @@ class BinaryHandler {
     hputs() {
       if ( ! this.publicKey ) {
         throw new Error(`Hardened string write requires public key for encryption`);
-      }
+      } 
+      throw new Error(`Implement`);
       return this;
     }
 
@@ -829,29 +925,59 @@ class BinaryHandler {
       if ( ! this.privateKey ) {
         throw new Error(`Hardened string read requires private key for decryption`);
       }
+      throw new Error(`Implement`);
       return this;
     }
 
-    hpojo() {
-      if ( ! this.privateKey && ! this.publicKey ) {
-        throw new Error(`Hardened object requires RSA key be set`);
+    hpojo(object) {
+      if (typeof object === 'object' && object !== null) {
+        if ( !object[this.constructor.hard] ) return this.pojo(object);
+        if ( !this.publicKey ) {
+          throw new Error(`Hardened object write requires RSA public key be set for encryption.`);
+        }
+        this._alignToNextWrite();
+        let pojoBuffer;
+        {//no file block to obtain the raw bytes of the pojo 
+          this.noFile = true;
+          this._alignToNextWrite();
+          object[this.constructor.hard] = false;
+          this.pojo(object);
+          object[this.constructor.hard] = true;
+          pojoBuffer = this.noFileBuffer;
+          this.noFile = false;
+        }
+
+        const encryptedBuffer = crypto.publicEncrypt(this.publicKey, pojoBuffer);
+        this.buffer(encryptedBuffer);
+        return this;
+      } else {
+        if ( !this.privateKey ) {
+          throw new Error(`Hardened object write requires RSA private key be set for decryption.`);
+        }
+        this._alignToNextRead();
+        const encryptedBuffer = this.buffer().last.value
+        const originalBuffer = crypto.privateDecrypt(this.privateKey, encryptedBuffer);
+        let originalObject;
+        {//no file block
+          this.noFile = true;
+          this._alignToNextRead();
+          this.noFileBuffer = originalBuffer;
+          originalObject = this.pojo().last.value;
+          DEBUG && console.log({originalObject, encryptedBuffer, tos: encryptedBuffer.toString()});
+          this.noFile = false;
+        }
+        const key = object || 'hpojo';
+        originalObject[this.constructor.hard] = true;
+        this.reading.push({ key, value: originalObject, type: 'hpojo' });
+        return this;
       }
-      // read
-        // read a buffer
-        // decrypt it
-        // pass the decrypted buffer to pojo
-        // set that value as reading/last
-      // write
-        // pass object to pojo for write to buffer
-        // encrypt that buffer 
-        // wrtie the encrypted buffer with buffer
-      return this;
     }
 
     hbuffer() {
       if ( ! this.privateKey && ! this.publicKey ) {
         throw new Error(`Hardened buffer requires RSA key be set`);
-      }
+      } 
+      throw new Error(`Implement`);
       return this;
     }
 
@@ -1205,6 +1331,7 @@ class BinaryHandler {
       if ( type != 'rsa' || ! publicKey ) {
         throw new Error(`RSA public key required`);
       }
+      this.publicKey = publicKey;
     }
 
     async setPrivateKey(filePath) {
@@ -1212,6 +1339,7 @@ class BinaryHandler {
       if ( type != 'rsa' || ! privateKey ) {
         throw new Error(`RSA private key required`);
       }
+      this.privateKey = privateKey;
     }
 
   // File signing and verification 

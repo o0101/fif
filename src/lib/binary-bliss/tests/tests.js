@@ -1,4 +1,5 @@
 import path from 'path';
+import os from 'os'
 import { statSync, unlinkSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'fs';
 import { BinaryHandler, BinaryTypes } from '../binary-bliss.js';
 import * as eddsa from '@noble/ed25519';
@@ -1388,12 +1389,54 @@ function testJumpEnd() {
   assertEqual(expectedContent, actualContent, 'Jump to end and append data');
 }
 
-function runTests() {
+async function testHardenedPojo() {
+  console.log('Testing HPOJO Type');
+
+  const handler = new BinaryHandler();
+  await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
+  await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
+  const pojo = {
+    name: 'Test',
+    age: 30,
+    nested: {
+      key: 'value',
+      array: [1, 'two', new Date()]
+    }
+  };
+  const filePath = path.join(process.cwd(), 'hpojo.bin');
+
+  handler.openFile(filePath);
+  pojo[BinaryHandler.hard] = true;
+  handler.hpojo(pojo);
+  handler.jump(0);
+
+  const readPojo = handler.hpojo().last.value;
+
+  assertEqual(pojo.name, readPojo.name, 'HPOJO name');
+  assertEqual(pojo.age, readPojo.age, 'HPOJO age');
+  assertEqual(pojo.nested.key, readPojo.nested.key, 'HPOJO nested key');
+  assertEqual(pojo.nested.array[0], readPojo.nested.array[0], 'HPOJO nested array number');
+  assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'HPOJO nested array string');
+  assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'HPOJO nested array date');
+
+
+  handler.signFile('private.key');
+  if ( ! handler.verifyFile('public.key') ) {
+    console.error(`${redCross} Test failed: File failed to verify.`);
+  } else {
+    console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+  }
+
+  handler.closeFile();
+}
+
+async function runTests() {
   readdirSync('.').forEach(name => name.endsWith('.bin') && cleanUp(name, true));
 
   if (BIT_ONLY) {
     bitTests();
   } else {
+    await testHardenedPojo();
     testColorType();
     bitTests();
     testBufferType();
@@ -1429,6 +1472,7 @@ function runTests() {
   cleanUp('public.key', true);
 }
 
-runTests();
+//runTests();
+testHardenedPojo();
 
 
