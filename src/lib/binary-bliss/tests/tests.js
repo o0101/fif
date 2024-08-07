@@ -13,10 +13,52 @@ const redCross = '\x1b[31m✗\x1b[0m';
 let privateKey, publicKey; 
 let totalPassed;
 
-runTests();
+// tests to run
+
+await simplifiedTestHPojoWithNestedHardenedFields();
+
+//runAllTests();
+//await testHPojoWithNestedHardenedFields();
+
+async function simplifiedTestHPojoWithNestedHardenedFields() {
+    console.log('Testing Simplified HPOJO With Nested Hardened Fields Type');
+
+    const pojo = {
+      [BinaryHandler.hard]: true,
+      name: new BinaryHandler.HardString('ABCD'),
+    };
+    const filePath = path.join(process.cwd(), 'simplified_pojo_with_hfield.bin');
+
+    const handler = new BinaryHandler();
+    await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
+    await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
+
+    handler.openFile(filePath);
+    handler.hpojo(pojo);
+    handler.jump(0);
+    const readPojo = handler.hpojo('pojo').last.value;
+
+    assertEqual(pojo.name.toString(), readPojo.name.toString(), 'POJO hardened string name');
+    assertEqual(pojo.age, readPojo.age, 'POJO age');
+    assertEqual(pojo.nested.key, readPojo.nested.key, 'POJO nested key');
+    assertEqual(pojo.nested.array[0], readPojo.nested.array[0], 'POJO hardened nested array number');
+    assertEqual(pojo.nested.array[1], readPojo.nested.array[1], 'POJO hardened nested array string');
+    assertEqual(pojo.nested.array[2].toISOString(), readPojo.nested.array[2].toISOString(), 'POJO hardened nested array date');
+    assertEqual(pojo.secondNest.bigFriend.join(' '), readPojo.secondNest.bigFriend.join(' '), 'POJO hardened nested array numbers');
+    assertBufferEqual(pojo.secondNest.awesomeFriend, readPojo.secondNest.awesomeFriend, 'POJO nested Hardened Buffer');
+
+    handler.signFile('private.key');
+    if ( ! handler.verifyFile('public.key') ) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+}
 
 // main function
-  async function runTests() {
+  async function runAllTests() {
     console.log(`\n\nTesting BinaryBliss binary file reading and writing library\n\n`);
     totalPassed = 0;
 
@@ -30,7 +72,7 @@ runTests();
       await testHardenedBuffer();
       await testHardenedString();
       await testPojoWithNestedHardenedFields();
-      //await testHPojoWithNestedHardenedFields();
+      await testHPojoWithNestedHardenedFields();
       testColorType();
       bitTests();
       testBufferType();
@@ -1582,7 +1624,6 @@ runTests();
 
     handler.closeFile();
   }
-  
 
 // cryptographic signing
   function saveKeys() {

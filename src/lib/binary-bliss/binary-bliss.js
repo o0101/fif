@@ -10,9 +10,9 @@ import { sign, verify } from '@noble/ed25519';
 import crypto from 'crypto';
 import { parseKey } from './keys.js';
 
-const DEBUG = false;
+const DEBUG = true;
 
-const ETEXT = true;
+const ETEXT = false;
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 // 32-bit register for bit operations that will not result in signed integers
 const R32 = new Uint32Array(1);
