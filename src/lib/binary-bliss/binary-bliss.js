@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { 
   accessSync, constants, openSync, readSync, writeSync, 
   closeSync, fstatSync, statSync, existsSync, readFileSync, 
@@ -26,18 +27,68 @@ class BinaryHandler {
       return HardString;
     }
 
+  // Debug
+    set d(context) {
+      const cwd = process.cwd();
+
+      const trace = (new Error).stack.split(/\s*\n\s*/g)
+        .slice(3)
+        .map(loc => loc.trim())
+        .filter(loc => loc.startsWith('at ') && !loc.includes('(node:'))
+        .map(loc => loc.replace(/^at /g, 'in ').replace(`file://${cwd}/`, '').replace(/[()]/g, '').trim())
+        .map(line => {
+          const match = line.split(/[\s:]+/g).filter(part => part.length);
+          if (match.length == 5) {
+            const [prefix, call, file, lineNumber, position] = match;
+            const codeLine = fs.readFileSync(path.resolve(file), 'utf-8').split('\n')[lineNumber - 1] || '';
+            const markers = ' '.repeat(position - 1) + '^^^';
+            return `  ${file.padStart(20)} ${lineNumber.padStart(6)}:  ${call}()\n\n\n  ${' '.repeat(32)}${codeLine}\n  ${' '.repeat(32)}${markers}\n\n`;
+          } else {
+            return '  '+line+'\n\n';
+          }
+        })
+
+        trace.reverse();
+
+        console.log(`trace:\n${trace.join('\n')}\n`);
+        console.log('\n');
+        console.log({context, binaryHandler: this});
+        console.log('\n\n');
+    }
+
   // Instance init
     constructor(endian = 'BE') {
       this.endian = endian;
       this._buffer = Buffer.alloc(0);
       this.reading = [];
       this.fd = null;
+      // dual mode noFile and file related
       this._nfCount = 0;
       this._noFile = false;
       this._cursor = 0;
       this._noFileCursor = 0;
       this._bitCursor = 0;
       this._noFileBitCursor = 0;
+      this._stack = [];
+      this.noFileBuffer = Buffer.alloc(0);
+    }
+
+  // Helper
+    get state() {
+      const {
+        _cursor,
+        _bitCursor,
+        _noFileCursor,
+        _noFileBitCursor,
+        noFileBuffer,
+      } = this;
+      return {
+        _cursor,
+        _noFileCursor,
+        _bitCursor,
+        _noFileBitCursor,
+        noFileBuffer,
+      };
     }
 
   // Helper variables related to various modes
@@ -65,19 +116,28 @@ class BinaryHandler {
     get noFile() { return this._noFile };
 
     set noFile(noFile) {
-      DEBUG && console.log(`Setting noFile`, noFile, this.noFileBuffer, this.cursor);
       if ( noFile ) {
-        this._nfCount++;
         if ( !this.noFileBuffer ) this.noFileBuffer = Buffer.alloc(0);
+        this._stack.push(this.state);
+        this._cursor = 0;
+        this._bitCursor = 0;
+        this._noFileCursor = 0;
+        this._noFileBitCursor = 0;
+        this.noFileBuffer = Buffer.alloc(0);
+        this._nfCount++;
         this._noFile = true;
       } else {
-        this._nfCount--;
+        if ( this._nfCount > 0 ) {
+          this._nfCount--;
+          Object.assign(this, this._stack.pop());
+        }
+
         if ( this._nfCount == 0 ) {
           this.noFileBuffer = null;
           this._noFileCursor = 0;
           this._noFileBitCursor = 0;
           this._noFile = false;
-        }
+        } 
       }
     }
 
@@ -90,7 +150,6 @@ class BinaryHandler {
     }
 
     set cursor(cursor) {
-      DEBUG && console.log(`Setting cursor`, cursor, this.noFileBuffer);
       if ( this.noFile ) {
         this._noFileCursor = cursor;
       } else {
@@ -166,7 +225,6 @@ class BinaryHandler {
           this.jumpEnd();
         }
 
-        DEBUG && console.log(`File opened: ${safePath} (${flag}) - ${mode}, fd=${this.fd}`);
         return this;
       } catch (err) {
         if (err.code === 'EACCES') {
@@ -193,7 +251,6 @@ class BinaryHandler {
           this.fd = null;
           this.cursor = 0;
           this.bitCursor = 0;
-          DEBUG && console.log(`File closed: ${this.filePath}`);
         } catch (err) {
           console.error(`Error closing file: ${this.filePath}`, err);
         }
@@ -309,7 +366,6 @@ class BinaryHandler {
       } else if (length <= 0x3FFF) { // 01 - 2 bytes
         buffer = Buffer.alloc(2);
         buffer.writeUInt16BE(length | 0x4000, 0);
-        DEBUG && console.log({length, lenghtOR: length | 0x4000, lengthORHex: (length|0x4000).toString('16')});
       } else if (length <= 0x3FFFFF) { // 10 - 3 bytes
         buffer = Buffer.alloc(3);
         buffer.writeUIntBE(length | 0x800000, 0, 3);
@@ -332,7 +388,6 @@ class BinaryHandler {
         buffer[0] = firstByte;
         buffer[1] = this._readBytes(1).readUInt8(0);
         length = ((buffer.readUInt16BE(0) & 0x3FFF));
-        DEBUG && console.log({length, firstByte, buffer});
       } else if ((firstByte & 0xC0) === 0x80) { // 10
         const buffer = Buffer.alloc(3);
         buffer[0] = firstByte;
@@ -354,10 +409,8 @@ class BinaryHandler {
 
   // Cursor management
     jump(cursorPosition) {
-      DEBUG && console.log(`Jumping to cursor position: ${cursorPosition}`);
       if (this._buffer.length) {
         this._writeBytes(this._buffer);
-        DEBUG && console.log(`Wrote ${this._buffer.length} bytes at jump to ${cursorPosition}.`);
         this._buffer = Buffer.alloc(0);
       }
       this.cursor = cursorPosition;
@@ -371,7 +424,6 @@ class BinaryHandler {
       } 
       if (this._buffer.length) {
         this._writeBytes(this._buffer);
-        DEBUG && console.log(`Wrote ${this._buffer.length} bytes at jump to ${cursorPosition}.`);
         this._buffer = Buffer.alloc(0);
       }
 
@@ -432,10 +484,8 @@ class BinaryHandler {
         let buffer;
         if ( this.noFile ) {
           buffer = Buffer.from(this.noFileBuffer.subarray(this.cursor, this.cursor+length));
-          DEBUG && console.log({noFile:true,buffer});
         } else {
           buffer = Buffer.alloc(length);
-          DEBUG && console.log({file:true,buffer});
           readSync(this.fd, buffer, 0, length, this.cursor);
         }
         if (opts.decode && ETEXT) {
@@ -443,7 +493,6 @@ class BinaryHandler {
         }
         this.cursor += length;
 
-        DEBUG && console.log(`Read bytes: length=${length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')} (text: ${buffer.toString()})`);
         return buffer;
       } catch (error) {
         console.error('Error reading bytes:', error);
@@ -466,7 +515,6 @@ class BinaryHandler {
         }
         this.cursor += buffer.length;
 
-        DEBUG && console.log(`Wrote bytes (${this.filePath}): length=${buffer.length}, cursor=${this.cursor}, buffer=${buffer.toString('hex')}`);
       } catch (error) {
         console.error('Error writing bytes:', error);
         throw error;
@@ -480,7 +528,6 @@ class BinaryHandler {
       }
 
       value = BigInt(value);
-      DEBUG && console.log(`\nWriting bits: length=${length}, value=${value.toString(2)}, bitOffset=${bitOffset}`);
 
       const byteAddr = i => Math.floor((i + bitOffset) / 8);
       const bitAddr = i => (i + bitOffset) % 8;
@@ -495,11 +542,9 @@ class BinaryHandler {
           buffer = Buffer.concat([buffer, Buffer.alloc(1)]); // Extend the buffer
         }
 
-        DEBUG && console.log(`Setting bit at byteIndex=${byteIndex}, bitIndex=${bitIndex}, iBit=${iBit}`);
         buffer[byteIndex] |= Number(iBit) << bitIndex;
       }
 
-      DEBUG && console.log(`Buffer after writeBits: ${buffer.toString('hex')}`);
       return { buffer, bitOffset: (bitOffset + length) % 8 };
     }
 
@@ -510,7 +555,6 @@ class BinaryHandler {
       }
 
       let value = BigInt(0);
-      DEBUG && console.log(`\nReading bits: length=${length}, bitOffset=${bitOffset}`);
 
       const byteAddr = i => Math.floor((i + bitOffset) / 8);
       const bitAddr = i => (i + bitOffset) % 8;
@@ -521,16 +565,13 @@ class BinaryHandler {
 
         const bit = (buffer[byteIndex] >> bitIndex) & 1;
         value |= BigInt(bit) << BigInt(length - 1 - i);
-        DEBUG && console.log(`Reading bit at byteIndex=${byteIndex}, bitIndex=${bitIndex}, bit=${bit}`);
       }
 
-      DEBUG && console.log(`Value after readBits: ${value.toString(2)}`);
       return { value, bitOffset: (bitOffset + length) % 8 };
     }
 
     bit(length, keyOrValue) {
       const byteLength = Math.ceil((this.bitCursor + length) / 8);
-      DEBUG && console.log(`\nBit operation: length=${length}, keyOrValue=${keyOrValue}, byteLength=${byteLength}`);
       if (typeof keyOrValue === 'string') {
         // Read mode
         if (byteLength > this._buffer.length) {
@@ -545,7 +586,6 @@ class BinaryHandler {
         } else {
           this._buffer = this._buffer.slice(-1);
         }
-        DEBUG && console.log(`Direct read: value=${value.toString(2)}, bitCursor=${this.bitCursor}`);
 
         return this;
       } else {
@@ -559,16 +599,13 @@ class BinaryHandler {
         if (bitOffset == 0) {
           // all bits used, carry forward nothing
           this._writeBytes(buffer);
-          DEBUG && console.log(`Wrote ${buffer.length} bytes`);
           this._buffer = Buffer.alloc(0);
         } else {
           // carry forward the partial unused bits
           this._buffer = buffer.slice(-1);
-          DEBUG && console.log(`Carried 1 bytes and wrote ${buffer.length - 1} bytes`);
           this._writeBytes(buffer.slice(0, -1));
         }
 
-        DEBUG && console.log(`Write operation: buffer=${buffer.toString('hex')}, bitCursor=${this.bitCursor}`);
         return this;
       }
     }
@@ -824,9 +861,7 @@ class BinaryHandler {
           value = this._readBytes(strLength).toString('latin1');
         } else {
           value = this._readBytes(strLength, { decode: ETEXT });
-          DEBUG && console.log({value});
           value = value.toString();
-          DEBUG && console.log({decoder:true, value, u8: new Uint8Array(value)});
         }
         this.reading.push({ key, value, type: 'string' });
       }
@@ -914,7 +949,7 @@ class BinaryHandler {
         this.noFile = false;
       }
 
-      const encryptedBuffer = rsaEncrypt(this.publicKey, stringBuffer);
+      const encryptedBuffer = this.rsaEncrypt(this.publicKey, stringBuffer);
       this.buffer(encryptedBuffer);
       return this;
     }
@@ -926,8 +961,7 @@ class BinaryHandler {
       
       this._alignToNextRead();
       const encryptedBuffer = this.buffer().last.value;
-      DEBUG && console.log({encryptedBuffer, key, pK: this.privateKey, r: this.reading});
-      const decryptedBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
+      const decryptedBuffer = this.rsaDecrypt(this.privateKey, encryptedBuffer);
       let originalString;
       {//no file block
         this.noFile = true;
@@ -963,8 +997,7 @@ class BinaryHandler {
           this.noFile = false;
         }
 
-        DEBUG && console.log({pk: this.publicKey, pojoBuffer});
-        const encryptedBuffer = rsaEncrypt(this.publicKey, pojoBuffer);
+        const encryptedBuffer = this.rsaEncrypt(this.publicKey, pojoBuffer);
         this.buffer(encryptedBuffer);
         return this;
       } else {
@@ -973,14 +1006,13 @@ class BinaryHandler {
         }
         this._alignToNextRead();
         const encryptedBuffer = this.buffer().last.value
-        const originalBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
+        const originalBuffer = this.rsaDecrypt(this.privateKey, encryptedBuffer);
         let originalObject;
         {//no file block
           this.noFile = true;
           this._alignToNextRead();
           this.noFileBuffer = Buffer.concat([this.noFileBuffer, originalBuffer]);
           originalObject = this.pojo().last.value;
-          DEBUG && console.log({originalObject, encryptedBuffer, tos: encryptedBuffer.toString()});
           this.noFile = false;
         }
         const key = object || 'hpojo';
@@ -1010,7 +1042,7 @@ class BinaryHandler {
           this.noFile = false;
         }
 
-        const encryptedBuffer = rsaEncrypt(this.publicKey, plainBuffer);
+        const encryptedBuffer = this.rsaEncrypt(this.publicKey, plainBuffer);
         this.buffer(encryptedBuffer);
         return this;
       } else if (typeof keyOrBuffer === 'string' || keyOrBuffer === undefined) {
@@ -1019,14 +1051,13 @@ class BinaryHandler {
         }
         this._alignToNextRead();
         const encryptedBuffer = this.buffer().last.value
-        const originalBuffer = rsaDecrypt(this.privateKey, encryptedBuffer);
+        const originalBuffer = this.rsaDecrypt(this.privateKey, encryptedBuffer);
         let plainBuffer;
         {//no file block
           this.noFile = true;
           this._alignToNextRead();
           this.noFileBuffer = Buffer.concat([this.noFileBuffer, originalBuffer]);
           plainBuffer = this.buffer().last.value;
-          DEBUG && console.log({plainBuffer, originalBuffer, encryptedBuffer});
           this.noFile = false;
         }
         const key = keyOrBuffer || 'hbuffer';
@@ -1150,7 +1181,6 @@ class BinaryHandler {
         this.writeLength(keys.length);
         for (const key of keys) {
           this.puts(key);
-          DEBUG && console.log({key, val: obj[key], obj});
           this._writeTypeAndValue(obj[key]);
         }
         return this;
@@ -1176,19 +1206,16 @@ class BinaryHandler {
       for (const { key, value, type } of this.reading) {
         result[key] = { value, type };
       }
-      DEBUG && console.log(`Read result: `, result);
       return result;
     }
 
     get last() {
       const lastItem = this.reading.length ? this.reading[this.reading.length - 1] : null;
-      DEBUG && console.log(`Last item: ${JSON.stringify(lastItem)}`);
       return lastItem;
     }
 
     $(searchKey) {
       const foundItem = this.reading.findLast(item => item.key === searchKey) || null;
-      DEBUG && console.log(`Find item by key (${searchKey}): ${JSON.stringify(foundItem)}`);
       return foundItem;
     }
 
@@ -1252,7 +1279,6 @@ class BinaryHandler {
       } else if (typeof value === 'object' && value !== null) {
         if ( value[this.constructor.hard] ) {
           this.uint8(BinaryType.HPOJO);
-          DEBUG && console.log({value});
           this.hpojo(value);
         } else {
           this.uint8(BinaryType.POJO);
@@ -1478,39 +1504,39 @@ class BinaryHandler {
       console.log('===========================');
       result.forEach(line => console.log(line));
     }
+
+  // Crypto support
+    chunkData(data, chunkSize) {
+      let chunks = [];
+      for (let i = 0; i < data.length; i += chunkSize) {
+        chunks.push(data.slice(i, i + chunkSize));
+      }
+      return chunks;
+    }
+
+    // Function to encrypt data in chunks using RSA with OAEP padding
+    rsaEncrypt(publicKey, data) {
+      const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+
+      const chunks = this.chunkData(data, keySize);
+      const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt(publicKey, chunk));
+
+      return Buffer.concat(encryptedChunks);
+    }
+
+    // Function to decrypt data in chunks using RSA with OAEP padding
+    rsaDecrypt(privateKey, encryptedData) {
+      const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+
+      const chunks = this.chunkData(encryptedData, 384);
+      const decryptedChunks = chunks.map(chunk => {
+        return crypto.privateDecrypt(privateKey, chunk);
+      });
+
+      return Buffer.concat(decryptedChunks);
+    }
 }
 
-// Crypto support
-  function chunkData(data, chunkSize) {
-    let chunks = [];
-    for (let i = 0; i < data.length; i += chunkSize) {
-      chunks.push(data.slice(i, i + chunkSize));
-    }
-    return chunks;
-  }
-
-  // Function to encrypt data in chunks using RSA with OAEP padding
-  function rsaEncrypt(publicKey, data) {
-    const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
-
-    const chunks = chunkData(data, keySize);
-    const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt(publicKey, chunk));
-    DEBUG && console.log(encryptedChunks.map(chunk => chunk.length));
-
-    return Buffer.concat(encryptedChunks);
-  }
-
-  // Function to decrypt data in chunks using RSA with OAEP padding
-  function rsaDecrypt(privateKey, encryptedData) {
-    const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
-
-    const chunks = chunkData(encryptedData, 384);
-    const decryptedChunks = chunks.map(chunk => {
-      return crypto.privateDecrypt(privateKey, chunk);
-    });
-
-    return Buffer.concat(decryptedChunks);
-  }
 
 // Transcoding Support Values
   const BinaryType = {
