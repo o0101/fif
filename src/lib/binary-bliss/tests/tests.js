@@ -94,7 +94,7 @@ runAllTests();
     ]);
 
     const color = new Color(255, 128, 64);
-    const filePath = path.join(process.cwd(), 'color.bin');
+    const filePath = path.join('tests', 'data', 'color.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -119,7 +119,7 @@ runAllTests();
   function testInterleavedBitFields() {
     console.log('Testing Interleaved Bit Fields');
 
-    const filePath = path.join('interleaved_bit_fields.bin');
+    const filePath = path.join('tests', 'data', 'interleaved_bit_fields.bin');
     const bh = new BinaryHandler();
     bh.openFile(filePath);
 
@@ -164,7 +164,7 @@ runAllTests();
   function testBitFields() {
     console.log('Testing Bit Fields');
 
-    const filePath = path.join('bit_fields.bin');
+    const filePath = path.join('tests', 'data', 'bit_fields.bin');
     const bh = new BinaryHandler();
     bh.openFile(filePath);
 
@@ -213,7 +213,7 @@ runAllTests();
   function testBitFieldCrossByteBoundary() {
     console.log('Testing Bit Fields Across Byte Boundaries');
 
-    const filePath = path.join('bit_fields_cross_byte.bin');
+    const filePath = path.join('tests', 'data', 'bit_fields_cross_byte.bin');
     const bh = new BinaryHandler();
     bh.openFile(filePath);
 
@@ -292,7 +292,7 @@ runAllTests();
 
     // Test Case 1: Write and Read single bits
     {
-      const filePath = path.join('bit_fields_single_bit.bin');
+      const filePath = path.join('tests', 'data', 'bit_fields_single_bit.bin');
       const bh = new BinaryHandler();
       bh.openFile(filePath);
 
@@ -311,7 +311,7 @@ runAllTests();
 
     // Test Case 2: Write and Read multi-bit values
     {
-      const filePath = path.join('bit_fields_multi_bit.bin');
+      const filePath = path.join('tests', 'data', 'bit_fields_multi_bit.bin');
       const bh = new BinaryHandler();
       bh.openFile(filePath);
 
@@ -330,7 +330,7 @@ runAllTests();
 
     // Test Case 3: Write and Read large bit values
     {
-      const filePath = path.join('bit_fields_large_value.bin');
+      const filePath = path.join('tests', 'data', 'bit_fields_large_value.bin');
       const bh = new BinaryHandler();
       bh.openFile(filePath);
 
@@ -346,7 +346,7 @@ runAllTests();
 
     // Test Case 4: Write and Read across byte boundaries
     {
-      const filePath = path.join('bit_fields_cross_byte_boundary.bin');
+      const filePath = path.join('tests', 'data', 'bit_fields_cross_byte_boundary.bin');
       const bh = new BinaryHandler();
       bh.openFile(filePath);
 
@@ -362,7 +362,7 @@ runAllTests();
 
     // Test Case 5: Write and Read mixed bit values
     {
-      const filePath = path.join('bit_fields_mixed_values.bin');
+      const filePath = path.join('tests', 'data', 'bit_fields_mixed_values.bin');
       const bh = new BinaryHandler();
       bh.openFile(filePath);
 
@@ -396,7 +396,7 @@ runAllTests();
     const map = new Map();
     map.set('abc', '123');
     map.set('def', '456');
-    const filePath = path.join(process.cwd(), 'map.bin');
+    const filePath = path.join('tests', 'data', 'map.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -425,7 +425,7 @@ runAllTests();
     console.log('Testing Heterogeneous Array');
 
     const array = ['012', 345, new Date()];
-    const filePath = path.join(process.cwd(), 'heteroArray.bin');
+    const filePath = path.join('tests', 'data', 'heteroArray.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -451,7 +451,7 @@ runAllTests();
     console.log('Testing Nested Array');
 
     const nestedArray = [[1, 2, 3], [4, 5, 6, [7, 8, 9]], 10, 'Hello', new Date()];
-    const filePath = path.join(process.cwd(), 'nestedArray.bin');
+    const filePath = path.join('tests', 'data', 'nestedArray.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -475,7 +475,7 @@ runAllTests();
   function testAlphabetSoup() {
     console.log('Testing Alphabet Soup of Bit Operations and Data Types');
 
-    const filePath = path.join(process.cwd(), 'alphabetSoup.bin');
+    const filePath = path.join('tests', 'data', 'alphabetSoup.bin');
     const handler = new BinaryHandler();
     handler.openFile(filePath);
 
@@ -573,7 +573,7 @@ runAllTests();
     console.log('Testing Mixed Type Array');
 
     const array = ['hello', 123, new Date(), { foo: 'bar' }, [1, 2, 3]];
-    const filePath = path.join(process.cwd(), 'mixedArray.bin');
+    const filePath = path.join('tests', 'data', 'mixedArray.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -601,7 +601,7 @@ runAllTests();
     console.log('Testing Date Type');
 
     const date = new Date();
-    const filePath = path.join(process.cwd(), 'date.bin');
+    const filePath = path.join('tests', 'data', 'date.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -625,7 +625,7 @@ runAllTests();
     console.log('Testing Float Type');
 
     const float = 123.456;
-    const filePath = path.join(process.cwd(), 'float.bin');
+    const filePath = path.join('tests', 'data', 'float.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -648,8 +648,8 @@ runAllTests();
   function testBufferType() {
     console.log('Testing Buffer Type');
 
-    const buffer = readFileSync('color.bin');
-    const filePath = path.join(process.cwd(), 'buffer.bin');
+    const buffer = readFileSync(path.resolve('tests', 'data', 'color.bin'));
+    const filePath = path.join('tests', 'data', 'buffer.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -674,7 +674,7 @@ runAllTests();
     console.log('Testing Magic Number');
 
     const magicNumber = 513;
-    const filePath = path.join(process.cwd(), 'magic_number.bin');
+    const filePath = path.join('tests', 'data', 'magic_number.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -698,7 +698,7 @@ runAllTests();
     console.log('Testing Magic String');
 
     const magicString = "GIF4";
-    const filePath = path.join(process.cwd(), 'magic_string.bin');
+    const filePath = path.join('tests', 'data', 'magic_string.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -722,7 +722,7 @@ runAllTests();
     console.log('Testing Magic Buffer');
 
     const magicBuffer = Buffer.from("GIF4", 'utf8');
-    const filePath = path.join(process.cwd(), 'magic_buffer.bin');
+    const filePath = path.join('tests', 'data', 'magic_buffer.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -753,7 +753,7 @@ runAllTests();
         array: [1, 'two', new Date()]
       }
     };
-    const filePath = path.join(process.cwd(), 'pojo.bin');
+    const filePath = path.join('tests', 'data', 'pojo.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -790,7 +790,7 @@ runAllTests();
         answer: "ÿßŸÑÿ≠ŸÖÿØ ŸÑŸÑŸá"
       }
     };
-    const filePath = path.join(process.cwd(), 'complex_non_latin_object.bin');
+    const filePath = path.join('tests', 'data', 'complex_non_latin_object.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -821,7 +821,7 @@ runAllTests();
     mapWithPojo.set('key1', 'value1');
     mapWithPojo.set('key2', { name: 'Test', greeting: "‰Ω†Â•Ω" });
 
-    const filePath = path.join(process.cwd(), 'map_with_pojo.bin');
+    const filePath = path.join('tests', 'data', 'map_with_pojo.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -855,7 +855,7 @@ runAllTests();
       ])
     };
 
-    const filePath = path.join(process.cwd(), 'pojo_with_map.bin');
+    const filePath = path.join('tests', 'data', 'pojo_with_map.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -882,7 +882,7 @@ runAllTests();
     console.log('Testing Set Type');
 
     const set = new Set([1, 'two', new Date()]);
-    const filePath = path.join(process.cwd(), 'set.bin');
+    const filePath = path.join('tests', 'data', 'set.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -920,7 +920,7 @@ runAllTests();
       details: new Set(['JavaScript', '‰Ω†Â•Ω'])
     };
 
-    const filePath = path.join(process.cwd(), 'pojo_with_set.bin');
+    const filePath = path.join('tests', 'data', 'pojo_with_set.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -955,7 +955,7 @@ runAllTests();
       { language: 'Python', greeting: 'ŸÖÿ±ÿ≠ÿ®ÿß' }
     ]);
 
-    const filePath = path.join(process.cwd(), 'set_with_pojo.bin');
+    const filePath = path.join('tests', 'data', 'set_with_pojo.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -986,7 +986,7 @@ runAllTests();
     console.log('Testing Gzip String');
 
     const originalString = 'Hello, this is a test string for gzip compression!';
-    const filePath = path.join(process.cwd(), 'gzip_string.bin');
+    const filePath = path.join('tests', 'data', 'gzip_string.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1011,7 +1011,7 @@ runAllTests();
     console.log('Testing Gzip Buffer');
 
     const originalBuffer = Buffer.from('Hello, this is a test buffer for gzip compression!', 'utf8');
-    const filePath = path.join(process.cwd(), 'gzip_buffer.bin');
+    const filePath = path.join('tests', 'data', 'gzip_buffer.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1033,7 +1033,7 @@ runAllTests();
   }
 
   function testGzipMixedContent() {
-    const filePath = path.join(process.cwd(), 'gzip_mixed_content.bin');
+    const filePath = path.join('tests', 'data', 'gzip_mixed_content.bin');
 
     console.log('Testing Gzip Mixed Content');
 
@@ -1070,7 +1070,7 @@ runAllTests();
   }
 
   function testFailVerify() {
-    const filePath = path.join(process.cwd(), 'fail_verify.bin');
+    const filePath = path.join('tests', 'data', 'fail_verify.bin');
 
     console.log('Testing Fail Verify');
 
@@ -1128,7 +1128,7 @@ runAllTests();
         nestedDate: new Date()
       }
     };
-    const filePath = path.join(process.cwd(), 'randomizedData.bin');
+    const filePath = path.join('tests', 'data', 'randomizedData.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1166,7 +1166,7 @@ runAllTests();
         nestedBuffer: Buffer.alloc(500000, 'D')
       }
     };
-    const filePath = path.join(process.cwd(), 'largeDataSet.bin');
+    const filePath = path.join('tests', 'data', 'largeDataSet.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1216,7 +1216,7 @@ runAllTests();
         new Date()
       ])
     };
-    const filePath = path.join(process.cwd(), 'complexNestedStructures.bin');
+    const filePath = path.join('tests', 'data', 'complexNestedStructures.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1274,7 +1274,7 @@ runAllTests();
     console.log('Testing BigInt Type');
 
     const bigIntValue =  false ? 123456789123456789123456789123456789n : 32498573459823475984237593408275342908574239085742390854723590823475n;
-    const filePath = path.join(process.cwd(), 'bigInt.bin');
+    const filePath = path.join('tests', 'data', 'bigInt.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1318,7 +1318,7 @@ runAllTests();
         32498573459823475984237593408275342908574239085742390854723590823475n,
       ]
     };
-    const filePath = path.join(process.cwd(), 'bigIntComplex.bin');
+    const filePath = path.join('tests', 'data', 'bigIntComplex.bin');
 
     const handler = new BinaryHandler();
     handler.openFile(filePath);
@@ -1358,7 +1358,7 @@ runAllTests();
   function testJumpEnd() {
     console.log('Testing Jump End');
 
-    const filePath = path.join(process.cwd(), 'jump_end_test.bin');
+    const filePath = path.join('tests', 'data', 'jump_end_test.bin');
 
     // Step 1: Create and write initial data to the file
     const initialData = 'Hello, World!';
@@ -1402,7 +1402,7 @@ runAllTests();
         array: [1, 'two', new Date()]
       }
     };
-    const filePath = path.join(process.cwd(), 'hpojo.bin');
+    const filePath = path.join('tests', 'data', 'hpojo.bin');
 
     handler.openFile(filePath);
     pojo[BinaryHandler.hard] = true;
@@ -1436,7 +1436,7 @@ runAllTests();
     await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
     await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
     const buf = Buffer.from('hello there weirdo. I love you even tho you are weird. Because you are good.');
-    const filePath = path.join(process.cwd(), 'hbuffer.bin');
+    const filePath = path.join('tests', 'data', 'hbuffer.bin');
 
     handler.openFile(filePath);
     buf[BinaryHandler.hard] = true;
@@ -1465,7 +1465,7 @@ runAllTests();
     await handler.setPrivateKey(path.resolve(os.homedir(), '.ssh/id_rsa'));
 
     const testString = new BinaryHandler.HardString('This is a test string for hputs and hgets');
-    const filePath = path.join(process.cwd(), 'hstring.bin');
+    const filePath = path.join('tests', 'data', 'hstring.bin');
 
     handler.openFile(filePath);
     handler.hputs(testString);
@@ -1507,7 +1507,7 @@ runAllTests();
         )
       }
     };
-    const filePath = path.join(process.cwd(), 'pojo_with_hfields.bin');
+    const filePath = path.join('tests', 'data', 'pojo_with_hfields.bin');
 
     const handler = new BinaryHandler();
     await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
@@ -1557,7 +1557,7 @@ runAllTests();
         )
       }
     };
-    const filePath = path.join(process.cwd(), 'pojo_with_hfields.bin');
+    const filePath = path.join('tests', 'data', 'pojo_with_hfields.bin');
 
     const handler = new BinaryHandler();
     await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
@@ -1593,7 +1593,7 @@ runAllTests();
       [BinaryHandler.hard]: true,
       name: new BinaryHandler.HardString('ABCD'),
     };
-    const filePath = path.join(process.cwd(), 'simplified_pojo_with_hfield.bin');
+    const filePath = path.join('tests', 'data', 'simplified_pojo_with_hfield.bin');
 
     const handler = new BinaryHandler();
     await handler.setPublicKey(path.resolve(os.homedir(), '.ssh/id_rsa.pub'));
