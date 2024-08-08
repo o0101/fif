@@ -8,7 +8,7 @@ import { Buffer } from 'buffer';
 import path from 'path';
 import zlib from 'zlib';
 import { sign, verify } from '@noble/ed25519';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 import { parseKey } from './keys.js';
 
 const DEBUG = true;
@@ -1426,16 +1426,22 @@ class BinaryHandler {
       return this;
     }
 
-    async setPublicKey(filePath) {
-      const {publicKey, type} = await parseKey(filePath);
+    async setPublicKey(filePathOrKey) {
+      if (filePathOrKey instanceof crypto.KeyObject && filePathOrKey.type == 'public') {
+        this.publicKey = filePathOrKey;
+      }
+      const {publicKey, type} = await parseKey(filePathOrKey);
       if ( type != 'rsa' || ! publicKey ) {
         throw new Error(`RSA public key required`);
       }
       this.publicKey = publicKey;
     }
 
-    async setPrivateKey(filePath) {
-      const {privateKey, type} = await parseKey(filePath);
+    async setPrivateKey(filePathOrKey) {
+      if (filePathOrKey instanceof crypto.KeyObject && filePathOrKey.type == 'private') {
+        this.privateKey = filePathOrKey;
+      }
+      const {privateKey, type} = await parseKey(filePathOrKey);
       if ( type != 'rsa' || ! privateKey ) {
         throw new Error(`RSA private key required`);
       }
