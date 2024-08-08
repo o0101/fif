@@ -1429,6 +1429,7 @@ class BinaryHandler {
     async setPublicKey(filePathOrKey) {
       if (filePathOrKey instanceof crypto.KeyObject && filePathOrKey.type == 'public') {
         this.publicKey = filePathOrKey;
+        return;
       }
       const {publicKey, type} = await parseKey(filePathOrKey);
       if ( type != 'rsa' || ! publicKey ) {
@@ -1440,6 +1441,7 @@ class BinaryHandler {
     async setPrivateKey(filePathOrKey) {
       if (filePathOrKey instanceof crypto.KeyObject && filePathOrKey.type == 'private') {
         this.privateKey = filePathOrKey;
+        return;
       }
       const {privateKey, type} = await parseKey(filePathOrKey);
       if ( type != 'rsa' || ! privateKey ) {
