@@ -1524,27 +1524,48 @@ class BinaryHandler {
 
     // Function to encrypt data in chunks using RSA with OAEP padding
     rsaEncrypt(publicKey, data) {
-      const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+      const keySize = publicKey.asymmetricKeyDetails.modulusLength / 8; // key size in bytes (256 bytes for 2048-bit key)
+      const oeapHash = 'sha256'
+      const paddingSize = calculatePaddingSize(oeapHash);
+      const chunkSize = keySize - paddingSize;
 
-      const chunks = this.chunkData(data, keySize);
-      const encryptedChunks = chunks.map(chunk => crypto.publicEncrypt(publicKey, chunk));
-
-      return Buffer.concat(encryptedChunks);
+      const chunks = this.chunkData(data, chunkSize);
+      let encryptedSize = 0;
+      const encryptedChunks = chunks.map(chunk => {
+        const cipher = crypto.publicEncrypt({
+          key: publicKey,
+          oeapHash,
+          oeapPadding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        }, chunk);
+        encryptedSize = cipher.length;
+        return cipher;
+      });
+        
+      const sizeHex = Buffer.from(encryptedSize.toString('16').padStart(4, 0), 'hex');
+      return Buffer.concat([sizeHex, ...encryptedChunks]);
     }
 
     // Function to decrypt data in chunks using RSA with OAEP padding
     rsaDecrypt(privateKey, encryptedData) {
-      const keySize = 2048 / 8; // key size in bytes (256 bytes for 2048-bit key)
+      const keySize = privateKey.asymmetricKeyDetails.modulusLength / 8; // key size in bytes (256 bytes for 2048-bit key)
 
-      const chunks = this.chunkData(encryptedData, 384);
+      const size = encryptedData.subarray(0,2);
+      const chunkSize = parseInt(size.toString('hex'), 16);
+      if ( chunkSize != keySize ) console.warn(`Key size (${keySize}) and encrypted chunk size (${chunkSize}) should be equal`);
+      encryptedData = encryptedData.subarray(2);
+      const chunks = this.chunkData(encryptedData, chunkSize);
       const decryptedChunks = chunks.map(chunk => {
-        return crypto.privateDecrypt(privateKey, chunk);
+        const plain = crypto.privateDecrypt({
+          key: privateKey,
+          oeapHash: 'sha256',
+          oeapPadding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        }, chunk);
+        return plain;
       });
 
       return Buffer.concat(decryptedChunks);
     }
 }
-
 
 // Transcoding Support Values
   const BinaryType = {
@@ -1671,6 +1692,20 @@ class BinaryHandler {
       return buffer;
     }
   };
+
+// Helper functions
+  function calculatePaddingSize(hashFunctionName) {
+    // Create a new hash object using the specified hash function
+    const hash = crypto.createHash(hashFunctionName);
+    
+    // Get the length of the hash output in bytes
+    const hashLength = hash.digest().length;
+    
+    // Calculate the padding size based on OAEP padding scheme
+    const paddingSize = 2 * hashLength + 2;
+    
+    return paddingSize;
+  }
 
 export { BinaryHandler, BinaryTypes };
 
