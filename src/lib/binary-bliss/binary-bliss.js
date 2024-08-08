@@ -11,9 +11,8 @@ import { sign, verify } from '@noble/ed25519';
 import crypto from 'node:crypto';
 import { parseKey } from './keys.js';
 
-const DEBUG = true;
-
-const ETEXT = false;
+const DEBUG = false;
+const ETEXT = true; // encode text with a bit rotation 
 const MAX_BUFFER_SIZE = 1024 * 1024 * 128; // 128 MB
 // 32-bit register for bit operations that will not result in signed integers
 const R32 = new Uint32Array(1);
@@ -57,8 +56,9 @@ class BinaryHandler {
     }
 
   // Instance init
-    constructor(endian = 'BE') {
+    constructor({endian = 'BE', etext = ETEXT} = {}) {
       this.endian = endian;
+      this.etext = etext;
       this._buffer = Buffer.alloc(0);
       this.reading = [];
       this.fd = null;
@@ -488,7 +488,7 @@ class BinaryHandler {
           buffer = Buffer.alloc(length);
           readSync(this.fd, buffer, 0, length, this.cursor);
         }
-        if (opts.decode && ETEXT) {
+        if (opts.decode && this.etext) {
           BinaryUtils.decode(buffer);
         }
         this.cursor += length;
@@ -504,7 +504,7 @@ class BinaryHandler {
       if (!buffer.length) return;
       try {
         this._validateBuffer(buffer);
-        if (opts.encode && ETEXT) {
+        if (opts.encode && this.etext) {
           BinaryUtils.encode(buffer);
         }
         if ( this.noFile ) {
@@ -841,7 +841,7 @@ class BinaryHandler {
       if (len !== null) {
         this._validateLength(len); // Validate the length
         this._ensureBytes(len);
-        let value = this._readBytes(len, { decode: ETEXT }).toString(encoding);
+        let value = this._readBytes(len, { decode: this.etext }).toString(encoding);
         this.reading.push({ key, value, type: 'string' });
       } else {
         // Read metadata
@@ -860,7 +860,7 @@ class BinaryHandler {
         if (encoding === 'binary') {
           value = this._readBytes(strLength).toString('latin1');
         } else {
-          value = this._readBytes(strLength, { decode: ETEXT });
+          value = this._readBytes(strLength, { decode: this.etext });
           value = value.toString();
         }
         this.reading.push({ key, value, type: 'string' });
@@ -890,7 +890,7 @@ class BinaryHandler {
         this.uint8(encodingType); // Write encoding type as integer
 
         this.writeLength(buffer.length);
-        if (ETEXT) {
+        if (this.etext) {
           BinaryUtils.encode(buffer);
         }
         this._writeBytes(buffer);
@@ -899,7 +899,7 @@ class BinaryHandler {
         this._validateLength(len); // Validate the length
         buffer = Buffer.alloc(len);
         buffer.write(value, 0, len, encoding);
-        this._writeBytes(buffer, { encode: ETEXT });
+        this._writeBytes(buffer, { encode: this.etext });
       }
       return this;
     }
