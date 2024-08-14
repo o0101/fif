@@ -29,7 +29,7 @@ console.log({rawPrices: prices, fitPrices: prices.map(p => p.toFixed(2))});
 ```
 
 **Output:**
-```json
+```javascript
 {
   rawPrices: [
     4.989999771118164,
@@ -302,7 +302,7 @@ For more examples, refer to the [tests/test.js](tests/test.js) file in the repos
 
 ## **Contributing**
 
-Contributions are welcome! Whether it's improving test coverage, enhancing the custom types, or proposing new features, we encourage you to participate. Please make sure to fully spec your idea nd get approval before submitting a pull request.
+Contributions are welcome! Whether it's improving test coverage, enhancing the custom types, or proposing new features, or improving documentation -- we heartily and warmly encourage you to participate. Please make sure to fully spec your idea, sign the CLA, and get approval before submitting a pull request.
 
 ## **Limitations**
 
