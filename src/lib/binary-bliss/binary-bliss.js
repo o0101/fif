@@ -1072,29 +1072,91 @@ class BinaryHandler {
     }
 
   // Complex and collection types
-    array(keyOrValue, length, type, delimiter = null) {
-      this._validateLength(length); // Validate the length
+    array(keyOrValue, typeOrDelimeter, delimiter = null) {
       if (Array.isArray(keyOrValue)) {
+        // Write mode
         this._alignToNextWrite();
+        
+        let type = typeOrDelimeter.toLowerCase();
+        const typeCode = BinaryType[type.toUpperCase()];
+        if ( type === 'string' ) {
+          type = 'puts';
+        }
+
+        if (!type || ! typeCode || !(typeof this[type] == 'function')) {
+          throw new Error(`Type (${type}) must be specified when writing an array, and must be a supported type: ${Object.keys(BinaryType).map(x => x.toLowerCase())}.`);
+        }
+
         const values = keyOrValue;
+
+        // Write array type and length
+        this.uint8(BinaryType.ARRAY); // Write array type flag
+        this.uint8(typeCode); // Write the type of elements in the array
+        this.writeLength(values.length); // Write the length of the array
+
         for (let i = 0; i < values.length; i++) {
-          this[type](values[i]);
+          this[type](values[i]); // Write each value in the array
           if (delimiter && i < values.length - 1) {
-            this._writeBytes(Buffer.from(delimiter));
+            this._writeBytes(Buffer.from(delimiter)); // Optionally write a delimiter
           }
         }
+
         return this;
       } else {
+        // Read mode
         this._alignToNextRead();
         const key = keyOrValue || 'array';
+        delimiter = typeOrDelimeter;
+
+        // Read array type and length
+        const arrayTypeFlag = this.uint8().last.value;
+        if (arrayTypeFlag !== BinaryType.ARRAY) {
+          throw new Error('Expected an array type flag.');
+        }
+
+        const elementTypeFlag = this.uint8().last.value;
+        const elementType = this._getTypeFromFlag(elementTypeFlag);
+        if ( elementType == 'string' ) {
+          elementType = 'gets';
+        }
+        const length = this.readLength();
+
         const values = [];
         for (let i = 0; i < length; i++) {
-          this[type](`value_${i}`);
+          this[elementType](`value_${i}`); // Read each value in the array
           values.push(this.$(`value_${i}`).value);
+          if (delimiter && i < length - 1) {
+            this._readBytes(delimiter.length); // Optionally skip over a delimiter
+          }
         }
+
         this.reading.push({ key, value: values, type: 'array' });
         return this;
       }
+    }
+
+    // Helper method to map type flags to method names
+    _getTypeFromFlag(flag) {
+      const typeMap = {
+        [BinaryType.STRING]: 'gets',
+        [BinaryType.INT8]: 'int8',
+        [BinaryType.UINT8]: 'uint8',
+        [BinaryType.INT16]: 'int16',
+        [BinaryType.UINT16]: 'uint16',
+        [BinaryType.INT32]: 'int32',
+        [BinaryType.UINT32]: 'uint32',
+        [BinaryType.FLOAT]: 'float',
+        [BinaryType.DOUBLE]: 'double',
+        [BinaryType.BOOL]: 'bool',
+        [BinaryType.BIGINT]: 'bigInt',
+        [BinaryType.BUFFER]: 'buffer',
+        [BinaryType.DATE]: 'date',
+        [BinaryType.POJO]: 'pojo',
+        [BinaryType.HPOJO]: 'hpojo',
+        // Add other types as needed
+      };
+
+      return typeMap[flag] || null;
     }
 
     heteroArray(keyOrValue, delimiter = null) {
@@ -1589,6 +1651,7 @@ class BinaryHandler {
     HPOJO: 18, // hardened pojo
     HSTRING: 19, // hardened string
     HBUFFER: 20, // hardened buffer
+    ARRAY: 21,
   };
 
   const EncodingType = {

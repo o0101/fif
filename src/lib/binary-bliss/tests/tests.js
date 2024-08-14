@@ -63,6 +63,11 @@ runAllTests();
       testBigIntType();
       testBigIntInComplexStructures();
       testJumpEnd();
+      testArrayWithoutDelimiter();
+      testArrayWithDelimiter();
+      testArrayWithComplexTypes();
+      testArrayAcrossMultipleDataTypes();
+      testEmptyArray();
     }
 
     cleanUp('private.key', true);
@@ -1079,7 +1084,7 @@ runAllTests();
     handler.openFile(filePath);
 
     const randomArray = Array.from({ length: 100 }, () => Math.floor(Math.random() * 256));
-    handler.array(randomArray, randomArray.length, 'uint8');
+    handler.array(randomArray, 'uint8');
 
     // Step 2: Sign the file
     handler.signFile('private.key');
@@ -1614,6 +1619,132 @@ runAllTests();
       console.log(`${greenCheck} Test passed: File signature successfully verified.`);
     }
     */
+
+    handler.closeFile();
+  }
+
+  function testArrayWithoutDelimiter() {
+    console.log('Testing Array Without Delimiter');
+
+    const arrayToWrite = [1, 2, 3, 4, 5];
+    const filePath = path.join('tests', 'data', 'arrayWithoutDelimiter.bin');
+
+    const handler = new BinaryHandler();
+    handler.openFile(filePath);
+    handler.array(arrayToWrite, 'uint32'); // Writing array with uint32 type
+    handler.jump(0); // Reset buffer for reading
+    const readArray = handler.array('array').last.value;
+
+    assertEqual(arrayToWrite.toString(), readArray.toString(), 'Array of integers without delimiter matches the written array');
+
+    handler.signFile('private.key');
+    if (!handler.verifyFile('public.key')) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+
+  function testArrayWithDelimiter() {
+    console.log('Testing Array With Delimiter');
+
+    const arrayToWrite = ['a', 'b', 'c'];
+    const delimiter = '|';
+    const filePath = path.join('tests', 'data', 'arrayWithDelimiter.bin');
+
+    const handler = new BinaryHandler();
+    handler.openFile(filePath);
+    handler.array(arrayToWrite, 'string', delimiter); // Writing array with delimiter
+    handler.jump(0); // Reset buffer for reading
+    const readArray = handler.array('array', delimiter).last.value;
+
+    assertEqual(arrayToWrite.toString(), readArray.toString(), 'Array of strings with delimiter matches the written array');
+
+    handler.signFile('private.key');
+    if (!handler.verifyFile('public.key')) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+
+  function testEmptyArray() {
+    console.log('Testing Empty Array');
+
+    const emptyArray = [];
+    const filePath = path.join('tests', 'data', 'emptyArray.bin');
+
+    const handler = new BinaryHandler();
+    handler.openFile(filePath);
+    handler.array(emptyArray, 'uint32'); // Writing an empty array
+    handler.jump(0); // Reset buffer for reading
+    const readArray = handler.array('array').last.value;
+
+    assertEqual(emptyArray.toString(), readArray.toString(), 'Empty array matches the written empty array');
+
+    handler.signFile('private.key');
+    if (!handler.verifyFile('public.key')) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+
+  function testArrayWithComplexTypes() {
+    console.log('Testing Array with Complex Types');
+
+    const complexArray = [
+      { id: 1, name: 'Alice' },
+      { id: 2, name: 'Bob' }
+    ];
+    const filePath = path.join('tests', 'data', 'arrayWithComplexTypes.bin');
+
+    const handler = new BinaryHandler();
+    handler.openFile(filePath);
+    handler.array(complexArray, 'pojo'); // Writing array of complex types
+    handler.jump(0); // Reset buffer for reading
+    const readArray = handler.array('people').last.value;
+
+    assertEqual(JSON.stringify(complexArray), JSON.stringify(readArray), 'Array of complex types matches the written array');
+
+    handler.signFile('private.key');
+    if (!handler.verifyFile('public.key')) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
+
+    handler.closeFile();
+  }
+
+  function testArrayAcrossMultipleDataTypes() {
+    console.log('Testing Array Across Multiple Data Types');
+
+    const mixedArray = [1, 'two', new Date('2024-01-01T00:00:00Z')];
+    const filePath = path.join('tests', 'data', 'arrayAcrossMultipleDataTypes.bin');
+
+    const handler = new BinaryHandler();
+    handler.openFile(filePath);
+    handler.heteroArray(mixedArray); // Writing a heterogeneous array
+    handler.jump(0); // Reset buffer for reading
+    const readArray = handler.heteroArray('array').last.value;
+
+    assertEqual(mixedArray[0], readArray[0], 'Array integer value matches');
+    assertEqual(mixedArray[1], readArray[1], 'Array string value matches');
+    assertEqual(mixedArray[2].toISOString(), readArray[2].toISOString(), 'Array date value matches');
+
+    handler.signFile('private.key');
+    if (!handler.verifyFile('public.key')) {
+      console.error(`${redCross} Test failed: File failed to verify.`);
+    } else {
+      console.log(`${greenCheck} Test passed: File signature successfully verified.`);
+    }
 
     handler.closeFile();
   }
