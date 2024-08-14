@@ -2,14 +2,51 @@
 
 Welcome to **BinaryBliss**, a versatile toolkit for handling binary data, file operations, and secure data management. This library is designed for advanced binary data manipulation, including bitwise operations, custom type definitions, encryption, and compression, all with a straightforward API.
 
+```javascript
+import { BinaryHandler } from './binary-bliss.js';
+
+const h = new BinaryHandler;
+
+h.openFile('my.bin');
+h.writeMagic("PRICES");
+h.writeLength(4);
+h.float(4.99);
+h.float(5.99);
+h.float(6.99);
+h.float(9.99);
+h.closeFile();
+
+h.openFile('my.bin');
+h.readMagic("PRICES");
+const len = h.readLength();
+const prices = [];
+for( let i = 0; i < len; i++ ) {
+  prices[i] = h.float().last.value;
+}
+h.closeFile();
+
+console.log({rawPrices: prices, fitPrices: prices.map(p => p.toFixed(2))});
+```
+
+Also, inspec the file with `xxd my.bin`:
+
+```hex
+00000000: 5052 4943 4553 0440 9fae 1440 bfae 1440  PRICES.@...@...@
+00000010: dfae 1441 1fd7 0a                        ...A...
+```
+
+For more detailed (and crazy) examples [see the tests.js file](tests/tests.js), or just read on below for brief API overview and usage examples.
+
 ## **Features**
 
+- **Supports a wide range of types** - BigInt, bit fields, Date objects, plus many other JavaScript built-in types and additional useful ones.
 - **Binary Data Manipulation:** Effortlessly read and write binary data, including detailed control over bit-level operations.
 - **Custom Type Definitions:** Define and manage custom binary types tailored to your specific needs.
 - **File Operations:** Robust file handling, including advanced cursor management, file operations, and data verification.
 - **Encryption & Decryption:** Secure data with RSA encryption, supporting hardened data types like strings, objects, and buffers.
 - **Compression:** Gzip compression support for optimizing data storage and transmission.
 - **Debugging Tools:** Integrated debugging tools to trace operations and inspect internal states.
+- **Memory Efficient:** Uses incremental reads and writes, with an automatically managed cursor, does not read the entire file into memory. 
 
 ## **Installation**
 
