@@ -3,7 +3,7 @@
 Welcome to **BinaryBliss**, a versatile toolkit for handling binary data, file operations, and secure data management. This library is designed for advanced binary data manipulation, including bitwise operations, custom type definitions, encryption, and compression, all with a straightforward API.
 
 ```javascript
-import { BinaryHandler } from './binary-bliss.js';
+import { BinaryHandler } from 'binary-bliss';
 
 const h = new BinaryHandler('BE'); // 'LE' also okay
 
