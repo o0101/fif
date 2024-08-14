@@ -5,7 +5,7 @@ Welcome to **BinaryBliss**, a versatile toolkit for handling binary data, file o
 ```javascript
 import { BinaryHandler } from './binary-bliss.js';
 
-const h = new BinaryHandler;
+const h = new BinaryHandler('BE'); // 'LE' also okay
 
 h.openFile('my.bin');
 h.writeMagic("PRICES");
