@@ -28,7 +28,20 @@ h.closeFile();
 console.log({rawPrices: prices, fitPrices: prices.map(p => p.toFixed(2))});
 ```
 
-Also, inspec the file with `xxd my.bin`:
+**Output:**
+```json
+{
+  rawPrices: [
+    4.989999771118164,
+    5.989999771118164,
+    6.989999771118164,
+    9.989999771118164
+  ],
+  fitPrices: [ '4.99', '5.99', '6.99', '9.99' ]
+}
+```
+
+Also, inspec your generated binary file with `xxd my.bin`:
 
 ```hex
 00000000: 5052 4943 4553 0440 9fae 1440 bfae 1440  PRICES.@...@...@
@@ -47,6 +60,12 @@ For more detailed (and crazy) examples [see the tests.js file](tests/tests.js), 
 - **Compression:** Gzip compression support for optimizing data storage and transmission.
 - **Debugging Tools:** Integrated debugging tools to trace operations and inspect internal states.
 - **Memory Efficient:** Uses incremental reads and writes, with an automatically managed cursor, does not read the entire file into memory. 
+
+## Design Principles
+
+Simplicity: we are not trying to be uber-packing efficient or schema aware like protobuf. Mediumly efficient is good enough.
+
+Simplicity: reading and writing binary files should be easy with the provision of a few key operations. We aim to provide that toolbelt.
 
 ## **Installation**
 
