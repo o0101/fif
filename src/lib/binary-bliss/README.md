@@ -2,8 +2,10 @@
 
 Welcome to **BinaryBliss**, a versatile toolkit for handling binary data, file operations, and secure data management. This library is designed for advanced binary data manipulation, including bitwise operations, custom type definitions, encryption, and compression, all with a straightforward API.
 
+*An [example](tests/readme-example.js) that demonstrates binary serialization as well as the different precision of float and double types:*
+
 ```javascript
-import { BinaryHandler } from 'binary-bliss';
+import { BinaryHandler } from './binary-bliss.js';
 
 const h = new BinaryHandler('BE'); // 'LE' also okay
 
@@ -14,6 +16,10 @@ h.float(4.99);
 h.float(5.99);
 h.float(6.99);
 h.float(9.99);
+h.double(4.99);
+h.double(5.99);
+h.double(6.99);
+h.double(9.99);
 h.closeFile();
 
 h.openFile('my.bin');
@@ -21,7 +27,10 @@ h.readMagic("PRICES");
 const len = h.readLength();
 const prices = [];
 for( let i = 0; i < len; i++ ) {
-  prices[i] = h.float().last.value;
+  prices.push(h.float().last.value)
+}
+for( let i = 0; i < len; i++ ) {
+  prices.push(h.double().last.value);
 }
 h.closeFile();
 
