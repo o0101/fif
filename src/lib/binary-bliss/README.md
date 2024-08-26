@@ -5,7 +5,7 @@ Welcome to **BinaryBliss**, a versatile toolkit for handling binary data, file o
 *An [example](tests/readme-example.js) that demonstrates binary serialization as well as the different precision of float and double types:*
 
 ```javascript
-import { BinaryHandler } from './binary-bliss.js';
+import { BinaryHandler } from '../binary-bliss.js';
 
 const h = new BinaryHandler('BE'); // 'LE' also okay
 
@@ -44,9 +44,18 @@ console.log({rawPrices: prices, fitPrices: prices.map(p => p.toFixed(2))});
     4.989999771118164,
     5.989999771118164,
     6.989999771118164,
-    9.989999771118164
+    9.989999771118164,
+    4.99,
+    5.99,
+    6.99,
+    9.99
   ],
-  fitPrices: [ '4.99', '5.99', '6.99', '9.99' ]
+  fitPrices: [
+    '4.99', '5.99',
+    '6.99', '9.99',
+    '4.99', '5.99',
+    '6.99', '9.99'
+  ]
 }
 ```
 
